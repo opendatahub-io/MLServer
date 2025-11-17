@@ -1,0 +1,23 @@
+name: "Prow sync upstream master"
+
+on:
+  workflow_dispatch:
+        
+env:
+  UPSTREAM_URL: "https://github.com/SeldonIO/MLServer.git"
+  
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+    
+      - name: Internal GitHub sync
+        uses: dchourasia/sync-git-branches@main
+        with:
+          upstream_repo: "${{ env.UPSTREAM_URL }}"
+          upstream_branch: "master"
+          downstream_branch: "master"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          merge_args: "--no-edit"
