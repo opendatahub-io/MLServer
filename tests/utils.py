@@ -124,7 +124,7 @@ async def _pack_with_venv(version: Tuple[int, int], req_txt: str, tarball_path: 
         # Upgrade pip and install dependencies
         pip_exe = os.path.join(venv_path, "bin", "pip")
         await _run(f"{pip_exe} install --upgrade pip")
-        await _run(f"{pip_exe} install -r {req_txt}")
+        await _run(f"cd {os.path.dirname(req_txt)} && {pip_exe} install -r {req_txt}")
 
         # Create tarball from the venv directory
         with tarfile.open(tarball_path, "w:gz") as tar:
