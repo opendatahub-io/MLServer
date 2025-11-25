@@ -153,7 +153,9 @@ async def _pack_with_conda(version: Tuple[int, int], env_yml: str, tarball_path:
         await _run(f"conda env remove -n {env_name}")
 
 
-async def _pack(use_conda: bool, version: Tuple[int, int], source_file: str, tarball_path: str):
+async def _pack(
+        use_conda: bool, version: Tuple[int, int], source_file: str, tarball_path: str
+):
     """
     Create an environment tarball. Uses either conda-pack or venv based on USE_CONDA env variable.
     """
