@@ -157,7 +157,8 @@ async def _pack(
     use_conda: bool, version: Tuple[int, int], source_file: str, tarball_path: str
 ):
     """
-    Create an environment tarball. Uses either conda-pack or venv based on USE_CONDA env variable.
+    Create an environment tarball.
+    Uses either conda-pack or venv based on USE_CONDA env variable.
     """
     if use_conda:
         # Use conda-pack based implementation
