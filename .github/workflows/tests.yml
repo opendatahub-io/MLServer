@@ -98,7 +98,7 @@ jobs:
           if [[ ${{ runner.os == 'macOS' }} ]]; then
             source ./hack/activate-libomp-macos.sh
           fi
-          poetry run tox -e mlserver
+          poetry run tox -e odh-mlserver
 
   test-runtimes:
     strategy:
@@ -195,4 +195,4 @@ jobs:
           if [[ ${{ runner.os == 'macOS' }} ]]; then
             source ./hack/activate-libomp-macos.sh
           fi
-          poetry run tox -e all-runtimes
+          poetry run tox -e odh-all-runtimes
