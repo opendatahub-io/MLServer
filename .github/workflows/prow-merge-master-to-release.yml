@@ -1,4 +1,4 @@
-name: "Prow merge release branch to rhoai-staging branch"
+name: "Prow merge master branch to release branch"
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
         uses: dchourasia/sync-git-branches@main
         with:
           upstream_repo: "${{ env.UPSTREAM_URL }}"
-          upstream_branch: ${{ github.ref_name }}
-          downstream_branch: "rhoai-staging"
+          upstream_branch: "master"
+          downstream_branch: "${{ github.ref_name }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           merge_args: "--no-edit"
