@@ -157,7 +157,12 @@ def prometheus_registry(metrics_registry: MetricsRegistry) -> CollectorRegistry:
 def event_loop():
     # By default use uvloop for tests
     install_uvloop_event_loop()
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No event loop running yet, create a new one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     yield loop
     loop.close()
 
