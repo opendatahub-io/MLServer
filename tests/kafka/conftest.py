@@ -80,7 +80,7 @@ def zookeeper(docker_client: DockerClient, kafka_network: str) -> str:
 
     container = docker_client.containers.run(
         name=zookeeper_name,
-        image="confluentinc/cp-zookeeper:latest",
+        image="confluentinc/cp-zookeeper:7.9.4",
         ports={
             f"{zookeeper_port}/tcp": str(zookeeper_port),
         },
@@ -107,7 +107,7 @@ async def kafka(docker_client: DockerClient, zookeeper: str, kafka_network: str)
 
     container = docker_client.containers.run(
         name=kafka_name,
-        image="confluentinc/cp-kafka:latest",
+        image="confluentinc/cp-kafka:7.9.4",
         ports={
             f"{kafka_port}/tcp": str(kafka_port),
         },
