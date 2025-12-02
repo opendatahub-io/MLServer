@@ -78,12 +78,7 @@ class Worker(Process):
         To avoid this, and be able to properly shut them down, we forcefully
         ignore the signals coming from the main parent process.
         """
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No event loop running yet, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        loop = asyncio.get_event_loop()
 
         for sign in IGNORED_SIGNALS:
             # Ensure that signal handlers are a no-op, to let the main process
