@@ -1,11 +1,13 @@
-name: "Prow merge release branch to rhoai-staging"
+name: "Prow Merge release-* Branch to rhoai-staging Branch"
 
 on:
   workflow_dispatch:
         
 env:
   UPSTREAM_URL: "https://github.com/opendatahub-io/MLServer.git"
-  
+  RELEASE_BRANCH: ${{ github.ref_name }}
+  TARGET_BRANCH: "rhoai-staging"
+
 jobs:
   auto-merge:
     if: startsWith(github.ref, 'refs/heads/release-')
@@ -13,12 +15,59 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-    
-      - name: Internal GitHub sync
-        uses: dchourasia/sync-git-branches@main
         with:
-          upstream_repo: "${{ env.UPSTREAM_URL }}"
-          upstream_branch: ${{ github.ref_name }}
-          downstream_branch: "rhoai-staging"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          merge_args: "--no-edit"
+          ref: rhoai-staging
+          fetch-depth: 0
+      - name: Sync ${{ github.ref_name }} to rhoai-staging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Generate sync branch name with timestamp
+          SYNC_BRANCH="sync-${RELEASE_BRANCH}-$(date +%Y-%m-%d-%H%M%S)"
+
+          # Check if there is any open sync PR from this release branch
+          EXISTING_PR=$(gh pr list --base "$TARGET_BRANCH" --json number,headRefName --jq ".[] | select(.headRefName | startswith(\"sync-${RELEASE_BRANCH}-\")) | .number" | head -n1)
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists for syncing $RELEASE_BRANCH to $TARGET_BRANCH."
+            echo "Please close any outstanding syncs from $RELEASE_BRANCH to $TARGET_BRANCH before proceeding."
+            exit 1
+          fi
+
+          # Configure git
+          git config user.name "Sync Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create new branch from current HEAD (rhoai-staging)
+          git checkout -b "$SYNC_BRANCH"
+
+          # Checkout all files from release branch except excluded ones
+          git checkout "origin/$RELEASE_BRANCH" -- . \
+            ':(exclude).tekton/mlserver-push.yaml' \
+            ':(exclude).github/workflows/prow-merge-release-to-staging.yml' \
+            ':(exclude).github/workflows/create-and-bump-tag.yml'
+
+          # Commit the changes
+          git commit -m "Sync changes from $RELEASE_BRANCH to $TARGET_BRANCH" || echo "No changes to commit"
+
+          # Push the sync branch
+          git push origin "$SYNC_BRANCH"
+
+          # Create new PR
+          gh pr create \
+            --base "$TARGET_BRANCH" \
+            --head "$SYNC_BRANCH" \
+            --title "Sync $RELEASE_BRANCH to $TARGET_BRANCH" \
+            --body "$(cat <<EOF
+          ## Description
+          - Automated sync of changes from $RELEASE_BRANCH to $TARGET_BRANCH
+          - Part of RHOAI release preparation
+
+          ## Changes
+          - All changes from $RELEASE_BRANCH except:
+            - \`.tekton/mlserver-push.yaml\`
+            - \`.github/workflows/prow-merge-release-to-staging.yml\`
+            - \`.github/workflows/create-and-bump-tag.yml\`
+
+          🤖 Generated with GitHub Actions
+          EOF
+          )"
