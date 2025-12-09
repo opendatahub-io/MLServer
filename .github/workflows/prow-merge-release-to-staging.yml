@@ -40,14 +40,16 @@ jobs:
           # Create new branch from current HEAD (rhoai-staging)
           git checkout -b "$SYNC_BRANCH"
 
-          # Checkout all files from release branch except excluded ones
-          git checkout "origin/$RELEASE_BRANCH" -- . \
-            ':(exclude).tekton/mlserver-push.yaml' \
-            ':(exclude).github/workflows/prow-merge-release-to-staging.yml' \
-            ':(exclude).github/workflows/create-and-bump-tag.yml'
+          # Perform the merge to maintain commit history
+          git merge "origin/$RELEASE_BRANCH" --no-commit --no-ff
 
-          # Commit the changes
-          git commit -m "Sync changes from $RELEASE_BRANCH to $TARGET_BRANCH" || echo "No changes to commit"
+          # Restore the files we want to keep from TARGET_BRANCH
+          git checkout "$TARGET_BRANCH" -- .tekton/mlserver-push.yaml
+          git checkout "$TARGET_BRANCH" -- .github/workflows/prow-merge-release-to-staging.yml
+          git checkout "$TARGET_BRANCH" -- .github/workflows/create-and-bump-tag.yml
+
+          # Complete the merge
+          git commit -m "Sync $RELEASE_BRANCH to $TARGET_BRANCH"
 
           # Push the sync branch
           git push origin "$SYNC_BRANCH"
