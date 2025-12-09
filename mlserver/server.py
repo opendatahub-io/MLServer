@@ -166,12 +166,7 @@ class MLServer:
         return model
 
     def _add_signal_handlers(self):
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No event loop running yet, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        loop = asyncio.get_event_loop()
 
         for sig in HANDLED_SIGNALS:
             loop.add_signal_handler(

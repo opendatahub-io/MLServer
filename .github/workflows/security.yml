@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - master
-      - release-*
-      - rhoai-staging
+      - release/*
   schedule:
     - cron: "23 18 * * *"
   workflow_dispatch:
@@ -70,11 +69,11 @@ jobs:
             --build-arg RUNTIMES=all \
             -t $MLSERVER_IMAGE
         env:
-          MLSERVER_IMAGE: quay.io/opendatahub/mlserver:${{ github.sha }}
+          MLSERVER_IMAGE: seldonio/mlserver:${{ github.sha }}
       - name: Scan Docker Image
         uses: snyk/actions/docker@master
         with:
-          image: quay.io/opendatahub/mlserver:${{ github.sha }}
+          image: seldonio/mlserver:${{ github.sha }}
           args: --fail-on=upgradable
             --severity-threshold=high
             --app-vulns
