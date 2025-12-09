@@ -1,16 +1,4 @@
 approvers:
-- brettmthompson
-- edwardquarm
-- Jooho
-- Raghul-M
-- RH-steve-grubb
-- rpancham
-- Snomaan6846
+- SeldonIO/mlops
 reviewers:
-- brettmthompson
-- edwardquarm
-- Jooho
-- Raghul-M
-- RH-steve-grubb
-- rpancham
-- Snomaan6846
+- SeldonIO/mlops
