@@ -2,11 +2,22 @@ import os
 import sys
 import pytest
 import json
+from unittest.mock import patch
 
 from mlserver.settings import CORSSettings, Settings, ModelSettings, ModelParameters
 from mlserver.repository import DEFAULT_MODEL_SETTINGS_FILENAME
+import mlserver.settings as mlserver_settings
 
 from .conftest import TESTDATA_PATH, TESTS_PATH
+
+
+@pytest.fixture(autouse=True)
+def clear_allowlist_caches_between_tests():
+    mlserver_settings._get_allowed_model_implementations.cache_clear()
+    mlserver_settings._load_image_baked_allowed_model_implementations.cache_clear()
+    yield
+    mlserver_settings._get_allowed_model_implementations.cache_clear()
+    mlserver_settings._load_image_baked_allowed_model_implementations.cache_clear()
 
 
 def test_settings_from_env(monkeypatch):
@@ -16,6 +27,11 @@ def test_settings_from_env(monkeypatch):
     settings = Settings()
 
     assert settings.http_port == http_port
+
+
+def test_settings_debug_default_is_disabled():
+    settings = Settings()
+    assert settings.debug is False
 
 
 def test_settings_from_env_file(monkeypatch):
@@ -44,7 +60,7 @@ def test_model_settings_from_env(monkeypatch):
     monkeypatch.setenv("mlserver_model_name", model_name)
     monkeypatch.setenv("mlserver_model_version", model_version)
     monkeypatch.setenv("mlserver_model_uri", model_uri)
-    monkeypatch.setenv("mlserver_model_implementation", "mlserver.MLModel")
+    monkeypatch.setenv("mlserver_model_implementation", "tests.fixtures.SumModel")
 
     model_settings = ModelSettings()
     model_settings.parameters = ModelParameters()
@@ -74,6 +90,274 @@ def test_model_settings_model_validate(obj: dict):
 
     assert pre_sys_path == post_sys_path
     assert model_settings.implementation.__name__ == "SumModel"
+
+
+def _build_model_settings(implementation=None) -> ModelSettings:
+    payload = {
+        "_source": os.path.join(TESTS_PATH, DEFAULT_MODEL_SETTINGS_FILENAME),
+        "name": "foo",
+    }
+    if implementation is not None:
+        payload["implementation"] = implementation
+    return ModelSettings.model_validate(payload)
+
+
+def _assert_implementation_resolves_to_mocked_runtime(
+    model_settings: ModelSettings, expected_import_path: str, mocked_runtime_name: str
+) -> None:
+    mocked_runtime = type(mocked_runtime_name, (), {})
+    with patch(
+        "mlserver.settings.import_string", return_value=mocked_runtime
+    ) as mock_import:
+        implementation = model_settings.implementation
+
+    assert implementation is mocked_runtime
+    mock_import.assert_called_once_with(expected_import_path)
+
+
+def _clear_internal_test_runtime_overrides(monkeypatch):
+    monkeypatch.delenv(mlserver_settings.INTERNAL_TEST_HOOKS_ENV, raising=False)
+    monkeypatch.delenv(
+        mlserver_settings.INTERNAL_TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV,
+        raising=False,
+    )
+
+
+def test_model_settings_allowlisted_implementation():
+    model_settings = _build_model_settings(
+        implementation="mlserver_sklearn.SKLearnModel"
+    )
+    _assert_implementation_resolves_to_mocked_runtime(
+        model_settings,
+        expected_import_path="mlserver_sklearn.SKLearnModel",
+        mocked_runtime_name="MockedSKLearnRuntime",
+    )
+
+
+def test_model_settings_builtin_runtime_class_is_canonicalized():
+    built_in_runtime = type(
+        "SKLearnModel", (), {"__module__": "mlserver_sklearn.sklearn"}
+    )
+    model_settings = ModelSettings(name="foo", implementation=built_in_runtime)
+
+    assert model_settings.implementation_ == "mlserver_sklearn.SKLearnModel"
+
+
+def test_model_settings_builtin_runtime_setter_is_canonicalized():
+    built_in_runtime = type(
+        "SKLearnModel", (), {"__module__": "mlserver_sklearn.sklearn"}
+    )
+    model_settings = _build_model_settings(
+        implementation="mlserver_sklearn.SKLearnModel"
+    )
+
+    model_settings.implementation = built_in_runtime
+
+    assert model_settings.implementation_ == "mlserver_sklearn.SKLearnModel"
+
+
+def test_model_settings_builtin_submodule_import_path_is_canonicalized():
+    model_settings = _build_model_settings(
+        implementation="mlserver_sklearn.sklearn.SKLearnModel"
+    )
+
+    assert model_settings.implementation_ == "mlserver_sklearn.SKLearnModel"
+
+
+def test_model_settings_untrusted_implementation_rejected():
+    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+        _build_model_settings(implementation="malicious.CustomModel")
+
+
+def test_model_settings_untrusted_env_implementation_rejected(monkeypatch):
+    monkeypatch.setenv("mlserver_model_name", "foo")
+    monkeypatch.setenv("mlserver_model_implementation", "malicious.CustomModel")
+    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+        ModelSettings()
+
+
+def test_model_settings_file_implementation_overrides_untrusted_env(monkeypatch):
+    monkeypatch.setenv("MLSERVER_MODEL_IMPLEMENTATION", "malicious.CustomModel")
+    model_settings = _build_model_settings(
+        implementation="mlserver_sklearn.SKLearnModel"
+    )
+    _assert_implementation_resolves_to_mocked_runtime(
+        model_settings,
+        expected_import_path="mlserver_sklearn.SKLearnModel",
+        mocked_runtime_name="MockedSKLearnRuntime",
+    )
+
+
+def test_model_settings_missing_file_implementation_falls_back_to_env_rejected(
+    monkeypatch,
+):
+    monkeypatch.setenv("MLSERVER_MODEL_IMPLEMENTATION", "malicious.CustomModel")
+    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+        _build_model_settings()
+
+
+def test_model_settings_missing_file_implementation_falls_back_to_allowlisted_env(
+    monkeypatch,
+):
+    monkeypatch.setenv("MLSERVER_MODEL_IMPLEMENTATION", "mlserver_sklearn.SKLearnModel")
+    model_settings = _build_model_settings()
+    _assert_implementation_resolves_to_mocked_runtime(
+        model_settings,
+        expected_import_path="mlserver_sklearn.SKLearnModel",
+        mocked_runtime_name="MockedSKLearnRuntime",
+    )
+
+
+def test_model_settings_empty_allowlist_rejected(monkeypatch):
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(mlserver_settings, "ALLOWED_MODEL_IMPLEMENTATIONS", set())
+
+    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+        _build_model_settings(implementation="mlserver_sklearn.SKLearnModel")
+
+
+def test_model_settings_malformed_allowlist_entry_rejected(monkeypatch):
+    # Whitespace-padded entries are treated as malformed and fail closed.
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings,
+        "ALLOWED_MODEL_IMPLEMENTATIONS",
+        {" mlserver_sklearn.SKLearnModel "},
+    )
+
+    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+        _build_model_settings(implementation="mlserver_sklearn.SKLearnModel")
+
+
+def test_model_settings_image_baked_custom_runtime_allowed(monkeypatch, tmp_path):
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text('["custom.RuntimeModel"]', encoding="utf-8")
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings, "TRUSTED_RUNTIMES_ARTIFACT_PATH", str(artifact_path)
+    )
+    monkeypatch.setattr(
+        mlserver_settings,
+        "ALLOWED_MODEL_IMPLEMENTATIONS",
+        {"mlserver_sklearn.SKLearnModel"},
+    )
+
+    model_settings = _build_model_settings(implementation="custom.RuntimeModel")
+    _assert_implementation_resolves_to_mocked_runtime(
+        model_settings,
+        expected_import_path="custom.RuntimeModel",
+        mocked_runtime_name="MockedCustomRuntime",
+    )
+
+
+def test_model_settings_invalid_trusted_runtime_artifact_rejected(
+    monkeypatch, tmp_path
+):
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text('{"runtime": "custom.RuntimeModel"}', encoding="utf-8")
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings, "TRUSTED_RUNTIMES_ARTIFACT_PATH", str(artifact_path)
+    )
+
+    with pytest.raises(
+        ValueError, match="Trusted runtimes artifact must be a JSON list"
+    ):
+        _build_model_settings(implementation="mlserver_sklearn.SKLearnModel")
+
+
+def test_model_settings_invalid_runtime_import_path_in_artifact_rejected(
+    monkeypatch, tmp_path
+):
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text('["custom-runtime"]', encoding="utf-8")
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings, "TRUSTED_RUNTIMES_ARTIFACT_PATH", str(artifact_path)
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Trusted runtimes artifact contains an invalid runtime import path",
+    ):
+        _build_model_settings(implementation="mlserver_sklearn.SKLearnModel")
+
+
+@pytest.mark.parametrize(
+    "invalid_runtime_path",
+    [
+        "RuntimeOnly",
+        "_private.RuntimeModel",
+        "custom._RuntimeModel",
+        "custöm.RuntimeModel",
+        "custom.Runtime-Model",
+        "custom.runtime$Model",
+    ],
+)
+def test_model_settings_unicode_or_special_runtime_in_artifact_rejected(
+    monkeypatch, tmp_path, invalid_runtime_path
+):
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text(
+        json.dumps([invalid_runtime_path]),
+        encoding="utf-8",
+    )
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings, "TRUSTED_RUNTIMES_ARTIFACT_PATH", str(artifact_path)
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Trusted runtimes artifact contains an invalid runtime import path",
+    ):
+        _build_model_settings(implementation="mlserver_sklearn.SKLearnModel")
+
+
+def test_model_settings_custom_runtime_not_in_image_artifact_rejected(
+    monkeypatch, tmp_path
+):
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text('["custom.AllowedRuntime"]', encoding="utf-8")
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings, "TRUSTED_RUNTIMES_ARTIFACT_PATH", str(artifact_path)
+    )
+    monkeypatch.setattr(
+        mlserver_settings,
+        "ALLOWED_MODEL_IMPLEMENTATIONS",
+        {"mlserver_sklearn.SKLearnModel"},
+    )
+
+    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+        _build_model_settings(implementation="custom.NotAllowedRuntime")
+
+
+def test_model_settings_trusted_runtime_artifact_is_cached(monkeypatch, tmp_path):
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text('["custom.RuntimeModel"]', encoding="utf-8")
+    _clear_internal_test_runtime_overrides(monkeypatch)
+    monkeypatch.setattr(
+        mlserver_settings, "TRUSTED_RUNTIMES_ARTIFACT_PATH", str(artifact_path)
+    )
+    monkeypatch.setattr(
+        mlserver_settings,
+        "ALLOWED_MODEL_IMPLEMENTATIONS",
+        {"mlserver_sklearn.SKLearnModel"},
+    )
+
+    mocked_runtime = type("MockedCustomRuntime", (), {})
+    with patch("mlserver.settings.open", wraps=open) as mock_open:
+        model_settings = _build_model_settings(implementation="custom.RuntimeModel")
+        with patch("mlserver.settings.import_string", return_value=mocked_runtime):
+            # Access twice to confirm the trusted-runtimes artifact is read once.
+            _ = model_settings.implementation
+            _ = model_settings.implementation
+
+    read_calls = [
+        call for call in mock_open.call_args_list if call.args[0] == str(artifact_path)
+    ]
+    assert len(read_calls) == 1
 
 
 def test_model_settings_serialisation():

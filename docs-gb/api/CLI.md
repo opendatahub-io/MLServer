@@ -33,6 +33,9 @@ root build [OPTIONS] FOLDER
 
 - `--no-cache` (Default: `False`)
 
+- `--allow-runtime` `<text>`
+  Additional custom runtime import path to allow in the built image. Use exact dotted Python import paths (`module.ClassName`). Multiple options are allowed.
+
 ### Arguments
 
 - `FOLDER`
@@ -49,6 +52,9 @@ root dockerfile [OPTIONS] FOLDER
 ### Options
 
 - `-i`, `--include-dockerignore` (Default: `False`)
+
+- `--allow-runtime` `<text>`
+  Additional custom runtime import path to include in the generated Dockerfile allowlist. Use exact dotted Python import paths (`module.ClassName`). Multiple options are allowed.
 
 ### Arguments
 

@@ -49,7 +49,12 @@ def _is_newer(a: MLModel, b: MLModel) -> int:
 
 
 def model_initialiser(model_settings: ModelSettings) -> MLModel:
-    model_class = model_settings.implementation
+    try:
+        model_class = model_settings.implementation
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Refused to load model '{model_settings.name}': {exc}"
+        ) from exc
     return model_class(model_settings)  # type: ignore
 
 

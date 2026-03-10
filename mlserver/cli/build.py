@@ -1,10 +1,13 @@
 import subprocess
 import os
+import json
 
 from tempfile import TemporaryDirectory
+from typing import List, Optional
 
 from .. import __version__
 from ..logging import logger
+from ..settings import TRUSTED_RUNTIMES_ARTIFACT_PATH, is_valid_runtime_import_path
 
 from .constants import (
     DockerfileName,
@@ -15,9 +18,58 @@ from .constants import (
 )
 
 
-def generate_dockerfile(base_image: str = DefaultBaseImage) -> str:
+def get_invalid_runtime_import_paths(
+    custom_runtimes: Optional[List[str]],
+) -> List[str]:
+    if not custom_runtimes:
+        return []
+
+    invalid_runtimes: List[str] = []
+    for runtime in custom_runtimes:
+        runtime = runtime.strip()
+        if not is_valid_runtime_import_path(runtime):
+            invalid_runtimes.append(runtime)
+
+    return sorted(set(invalid_runtimes))
+
+
+def _normalise_custom_runtimes(custom_runtimes: Optional[List[str]]) -> List[str]:
+    if not custom_runtimes:
+        return []
+
+    invalid_runtimes = get_invalid_runtime_import_paths(custom_runtimes)
+    if invalid_runtimes:
+        invalid_values = ", ".join(invalid_runtimes)
+        raise ValueError(
+            f"Invalid runtime import path(s): {invalid_values}. "
+            "Expected a dotted Python import path."
+        )
+
+    normalised: List[str] = []
+    seen = set()
+    for runtime in custom_runtimes:
+        runtime = runtime.strip()
+        if runtime not in seen:
+            seen.add(runtime)
+            normalised.append(runtime)
+
+    return normalised
+
+
+def generate_dockerfile(
+    base_image: str = DefaultBaseImage,
+    custom_runtimes: Optional[List[str]] = None,
+) -> str:
     base_image = base_image.format(version=__version__)
-    return DockerfileTemplate.format(base_image=base_image)
+    trusted_runtime_allowlist_json = json.dumps(
+        _normalise_custom_runtimes(custom_runtimes),
+        indent=2,
+    )
+    return DockerfileTemplate.format(
+        base_image=base_image,
+        trusted_runtime_allowlist_json=trusted_runtime_allowlist_json,
+        trusted_runtimes_artifact_path=TRUSTED_RUNTIMES_ARTIFACT_PATH,
+    )
 
 
 def write_dockerfile(

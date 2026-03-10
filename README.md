@@ -83,6 +83,19 @@ Out of the box, MLServer provides support for:
 | Alibi-Explain | ✅        | [MLServer Alibi Explain](./runtimes/alibi-explain)               |
 | HuggingFace   | ✅        | [MLServer HuggingFace](./runtimes/huggingface)                   |
 
+### Runtime Security Maintainer Note
+
+MLServer enforces a trusted runtime implementation allowlist in
+`mlserver/settings.py` (`ALLOWED_MODEL_IMPLEMENTATIONS`) when resolving model
+implementations from `model-settings.json` and
+`MLSERVER_MODEL_IMPLEMENTATION`.
+
+If you add a new runtime implementation, you must also:
+
+1. Add the runtime import path to `ALLOWED_MODEL_IMPLEMENTATIONS`.
+2. Add or update tests validating allowlist behavior.
+3. Keep runtime docs/examples aligned with the implementation import path.
+
 MLServer is licensed under the Apache License, Version 2.0. However please note that software used in conjunction with, or alongside, MLServer may be licensed under different terms. For example, Alibi Detect and Alibi Explain are both licensed under the Business Source License 1.1. For more information about the legal terms of products that are used in conjunction with or alongside MLServer, please refer to their respective documentation.
 
 ## Supported Python Versions

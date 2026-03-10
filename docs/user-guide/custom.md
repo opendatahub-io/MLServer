@@ -314,6 +314,30 @@ runtime, we should be able to just run:
 mlserver build . -t my-custom-server
 ```
 
+```{note}
+When using custom runtimes, pass the exact dotted Python
+import path for each runtime through `--allow-runtime` (for example
+`--allow-runtime custom_runtime.MyRuntime`).
+```
+
+```{note}
+Python modules placed only in the model folder are not auto-imported at serve
+time. Package custom runtime code into the built image and allowlist it through
+`--allow-runtime`.
+```
+
+```bash
+mlserver build . -t my-custom-server \
+  --allow-runtime custom_runtime.MyRuntime
+```
+
+```{note}
+Migration tip: if you already have custom runtime images, make sure every
+runtime in use is declared through `--allow-runtime module.ClassName` during
+build. Runtime import paths not present in the trusted allowlist will be
+rejected at load time.
+```
+
 The output will be a Docker image named `my-custom-server`, ready to be used.
 
 ### Custom Environment
@@ -370,6 +394,12 @@ dockerfile`](../reference/cli) subcommand which will just generate a
 `Dockerfile` (and optionally a `.dockerignore` file) exactly like the one used
 by the `mlserver build` command.
 This `Dockerfile` can then be customised according to your needs.
+
+```{note}
+If your image uses custom runtimes, pass `--allow-runtime module.ClassName`
+to `mlserver dockerfile` so the generated `trusted-runtimes` allowlist matches
+what you intend to serve.
+```
 
 ````{note}
 The base `Dockerfile` requires [Docker's

@@ -14,6 +14,43 @@ loaded models (unless they get overriden by a `model-settings.json` file).
 Additionally, if no `model-settings.json` file is found, MLServer will also try
 to load a _"default"_ model from these environment variables.
 
+## Runtime Implementation Security
+
+MLServer validates `implementation` against a trusted allowlist of runtime
+classes before importing it.
+
+- Built-in runtimes (for example, `mlserver_sklearn.SKLearnModel`,
+  `mlserver_xgboost.XGBoostModel`, `mlserver_lightgbm.LightGBMModel`, and
+  `mlserver_onnx.OnnxModel`) are always allowlisted.
+- Custom runtimes can be allowlisted at image build time through
+  `mlserver build --allow-runtime module.ClassName`.
+- The dotted `module.ClassName` format is required intentionally to keep
+  runtime declarations explicit and unambiguous.
+- The same validation applies regardless of whether `implementation` comes from
+  `model-settings.json` or `MLSERVER_MODEL_IMPLEMENTATION`.
+
+### Troubleshooting trusted runtime validation
+
+If startup or model loading fails with:
+
+`Model implementation 'module.ClassName' is not in the allowlist of trusted runtimes.`
+
+check the following:
+
+- The value is a dotted import path in `module.ClassName` format.
+- The runtime package and module are importable in the serving image.
+- For custom runtimes in built images, include each runtime with
+  `mlserver build --allow-runtime module.ClassName`.
+- If both environment variables and `model-settings.json` are present, remember
+  `model-settings.json` values take precedence per model.
+
+### Migration note for existing custom runtimes
+
+If you previously relied on dynamically importable runtime paths without an
+explicit allowlist entry, update your image build pipeline to pass all served
+custom runtimes through `--allow-runtime`. This keeps runtime loading explicit
+and prevents accidental execution of unexpected classes.
+
 ## Settings
 
 ```{eval-rst}

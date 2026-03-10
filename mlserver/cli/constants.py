@@ -58,6 +58,13 @@ RUN ./hack/build-env.sh . && \\
     chown -R 1000:0 ./envs/base && \\
     chmod -R 776 ./envs/base && \\
     rm -rf /root/.cache/pip
+
+RUN mkdir -p $(dirname {trusted_runtimes_artifact_path}) && \\
+    cat <<'EOF' > {trusted_runtimes_artifact_path}
+{trusted_runtime_allowlist_json}
+EOF
+RUN chmod 0444 {trusted_runtimes_artifact_path} && \\
+    chmod 0555 $(dirname {trusted_runtimes_artifact_path})
 USER 1000
 
 # Copy everything else

@@ -12,6 +12,7 @@ from typing import List, Tuple
 
 from aiohttp.client_exceptions import (
     ClientConnectorError,
+    ClientConnectionResetError,
     ClientOSError,
     ServerDisconnectedError,
 )
@@ -188,6 +189,7 @@ class RESTClient:
             statuses=[400],
             exceptions={
                 ClientConnectorError,
+                ClientConnectionResetError,
                 ClientOSError,
                 ServerDisconnectedError,
                 ConnectionRefusedError,
@@ -205,6 +207,20 @@ class RESTClient:
     async def wait_until_model_ready(self, model_name: str) -> None:
         endpoint = f"http://{self._http_server}/v2/models/{model_name}/ready"
         await self._retry_get(endpoint)
+
+    async def wait_until_model_indexed(
+        self, model_name: str, timeout_s: float = 20.0
+    ) -> None:
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        while asyncio.get_running_loop().time() < deadline:
+            loaded_models = await self.list_models()
+            if model_name in {model.name for model in loaded_models}:
+                return
+            await asyncio.sleep(0.5)
+
+        raise AssertionError(
+            f"Model '{model_name}' was not indexed within {timeout_s}s."
+        )
 
     async def wait_until_live(self) -> None:
         endpoint = f"http://{self._http_server}/v2/health/live"
