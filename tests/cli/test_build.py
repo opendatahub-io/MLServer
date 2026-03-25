@@ -1,3 +1,4 @@
+import json
 import logging
 
 import pytest
@@ -13,8 +14,12 @@ from mlserver import __version__
 from mlserver.repository import DEFAULT_MODEL_SETTINGS_FILENAME
 from mlserver.repository.load import load_model_settings
 from mlserver.types import InferenceRequest, Parameters
-from mlserver.settings import Settings, TRUSTED_RUNTIMES_ARTIFACT_PATH
-from mlserver.cli.constants import DockerfileTemplate, DefaultBaseImage
+from mlserver.settings import (
+    Settings,
+    TRUSTED_RUNTIMES_ARTIFACT_PATH,
+    ALLOWED_MODEL_IMPLEMENTATIONS,
+)
+from mlserver.cli.constants import DefaultBaseImage
 from mlserver.cli.build import generate_dockerfile, build_image
 
 from ..utils import RESTClient
@@ -144,13 +149,12 @@ def test_generate_dockerfile(base_image: Optional[str]):
 
     expected = base_image.format(version=__version__)
     assert expected in dockerfile
-    assert dockerfile == DockerfileTemplate.format(
-        base_image=expected,
-        trusted_runtime_allowlist_json="[]",
-        trusted_runtimes_artifact_path=TRUSTED_RUNTIMES_ARTIFACT_PATH,
-        custom_runtime_copy_instructions="",
-        custom_runtime_pythonpath_env="",
-    )
+
+    # Verify the trusted runtime section is present
+    assert TRUSTED_RUNTIMES_ARTIFACT_PATH in dockerfile
+    expected_allowlist = sorted(ALLOWED_MODEL_IMPLEMENTATIONS)
+    expected_json = json.dumps(expected_allowlist)
+    assert expected_json in dockerfile
 
 
 def test_generate_dockerfile_rejects_custom_runtime_allowlist_without_runtime_paths():

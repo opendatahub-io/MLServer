@@ -21,6 +21,11 @@ class MetadataServerErrorResponse(BaseModel):
     error: str
 
 
+class RuntimeSecurityMode(Enum):
+    LOCKED = "LOCKED"
+    UNRESTRICTED = "UNRESTRICTED"
+
+
 class MetadataModelErrorResponse(BaseModel):
     error: str
 
@@ -69,6 +74,14 @@ class Datatype(Enum):
     FP32 = "FP32"
     FP64 = "FP64"
     BYTES = "BYTES"
+
+
+class RuntimeSecurityResponse(BaseModel):
+    mode: RuntimeSecurityMode
+    allowed_model_implementations: Optional[List[str]] = Field(
+        None,
+        description="List of allowed model implementation import paths when locked.",
+    )
 
 
 class MetadataTensor(BaseModel):

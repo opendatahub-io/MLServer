@@ -1,5 +1,6 @@
 ARG BASE_IMAGE="registry.access.redhat.com/ubi9/ubi-minimal"
 ARG RUNTIMES="lightgbm onnx sklearn xgboost"
+ARG TRUSTED_RUNTIMES="mlserver_lightgbm.LightGBMModel mlserver_onnx.OnnxModel mlserver_sklearn.SKLearnModel mlserver_xgboost.XGBoostModel"
 
 FROM ${BASE_IMAGE} AS wheel-builder
 
@@ -41,6 +42,7 @@ RUN pip install poetry==$POETRY_VERSION && \
 FROM ${BASE_IMAGE}
 
 ARG RUNTIMES
+ARG TRUSTED_RUNTIMES
 ARG PYTHON_VERSION=3.12
 
 # Set a few default environment variables, including `LD_LIBRARY_PATH`
@@ -89,6 +91,20 @@ RUN --mount=type=bind,from=wheel-builder,src=/opt/mlserver/dist,target=./dist \
 
 COPY ./licenses/license.txt .
 COPY ./licenses/license.txt /licenses/
+
+# Generate trusted-runtimes.json with only installed runtimes
+RUN set -eu; \
+    runtimes_json="["; \
+    separator=""; \
+    for impl in $TRUSTED_RUNTIMES; do \
+        runtimes_json="${runtimes_json}${separator}\"${impl}\""; \
+        separator=","; \
+    done; \
+    runtimes_json="${runtimes_json}]"; \
+    mkdir -p /etc/mlserver; \
+    echo "$runtimes_json" > /etc/mlserver/trusted-runtimes.json; \
+    chmod 0444 /etc/mlserver/trusted-runtimes.json; \
+    chmod 0555 /etc/mlserver
 
 USER 1000
 

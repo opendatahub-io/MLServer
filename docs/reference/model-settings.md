@@ -16,21 +16,28 @@ to load a _"default"_ model from these environment variables.
 
 ## Runtime Implementation Security
 
-MLServer validates `implementation` against a trusted allowlist of runtime
-classes before importing it.
+MLServer operates in one of two security modes when loading custom runtimes:
 
-- Built-in runtimes (for example, `mlserver_sklearn.SKLearnModel`,
-  `mlserver_xgboost.XGBoostModel`, `mlserver_lightgbm.LightGBMModel`, and
-  `mlserver_onnx.OnnxModel`) are always allowlisted.
-- Custom runtimes require both a trusted import path and baked source path at
-  image build time. For each custom runtime, pass
-  `--allow-runtime module.ClassName` and a matching `--runtime-path`.
-- If `--runtime-path` points to a directory, it must be an importable Python
-  package containing `__init__.py`.
-- The dotted `module.ClassName` format is required intentionally to keep
-  runtime declarations explicit and unambiguous.
-- The same validation applies regardless of whether `implementation` comes from
-  `model-settings.json` or `MLSERVER_MODEL_IMPLEMENTATION`.
+**LOCKED Mode (Production):**
+- Active when a trusted runtimes allowlist file exists in the image
+- MLServer validates `implementation` against this allowlist before importing
+- Built-in runtimes (e.g., `mlserver_sklearn.SKLearnModel`,
+  `mlserver_xgboost.XGBoostModel`, `mlserver_lightgbm.LightGBMModel`,
+  `mlserver_onnx.OnnxModel`) are always allowlisted
+- Custom runtimes require `--allow-runtime module.ClassName` and matching
+  `--runtime-path` during image build
+- Directory paths must point to importable Python packages with `__init__.py`
+- The dotted `module.ClassName` format keeps declarations explicit
+
+**UNRESTRICTED Mode (Development):**
+- Active when no allowlist file exists (e.g., running `mlserver start` directly)
+- Custom runtimes are dynamically loaded from model folders at runtime
+- Simply place your custom runtime `.py` file next to `model-settings.json`
+- MLServer automatically discovers and imports the runtime class
+- **Warning:** Only use for local development - not for production
+
+The validation applies regardless of whether `implementation` comes from
+`model-settings.json` or `MLSERVER_MODEL_IMPLEMENTATION`.
 
 ### Troubleshooting trusted runtime validation
 
@@ -55,6 +62,42 @@ explicit allowlist entry, update your image build pipeline to pass all served
 custom runtimes through `--allow-runtime` and include corresponding
 `--runtime-path` values. This keeps runtime loading explicit and prevents
 accidental execution of unexpected classes.
+
+### Querying runtime security configuration
+
+You can inspect the current runtime security configuration through the
+`/v2/runtimes` REST endpoint or the `RuntimeSecurity` gRPC method. This returns
+the security mode (`LOCKED` or `UNRESTRICTED`) and, when in `LOCKED` mode, the
+list of allowed model implementations.
+
+**REST Example:**
+
+```bash
+curl http://localhost:8080/v2/runtimes
+```
+
+**Response (LOCKED mode):**
+
+```json
+{
+  "mode": "LOCKED",
+  "allowed_model_implementations": [
+    "mlserver_sklearn.SKLearnModel",
+    "mlserver_xgboost.XGBoostModel",
+    "mlserver_lightgbm.LightGBMModel",
+    "mlserver_onnx.OnnxModel",
+    "models.MyCustomRuntime"
+  ]
+}
+```
+
+**Response (UNRESTRICTED mode):**
+
+```json
+{
+  "mode": "UNRESTRICTED"
+}
+```
 
 ## Settings
 

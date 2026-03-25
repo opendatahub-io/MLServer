@@ -50,7 +50,11 @@ async def test_metadata(settings, data_plane, server_name, server_version, exten
 
     assert metadata.name == settings.server_name
     assert metadata.version == settings.server_version
-    assert metadata.extensions == settings.extensions
+    # Built-in extensions are always present
+    expected_extensions = ["model_repository", "runtime_security"]
+    if extensions is not None:
+        expected_extensions += extensions
+    assert metadata.extensions == expected_extensions
 
 
 @pytest.mark.parametrize(

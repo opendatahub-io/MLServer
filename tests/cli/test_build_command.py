@@ -152,22 +152,21 @@ def test_build_accepts_legacy_builtin_implementation_without_allow_runtime(
     assert captured["custom_runtimes"] == []
 
 
-def test_build_canonicalizes_legacy_allow_runtime_for_builtins(
+def test_build_rejects_allow_runtime_without_runtime_path(
     monkeypatch, cli_main, cli_build, runner
 ):
-    captured = {}
-    _patch_build_pipeline(monkeypatch, cli_main, cli_build, captured)
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
 
     with runner.isolated_filesystem():
         result = _invoke_build(
             runner,
             cli_main,
-            allow_runtimes=("mlserver_sklearn.sklearn.SKLearnModel",),
+            allow_runtimes=("mlserver_sklearn.SKLearnModel",),
         )
 
-    assert result.exit_code == 0
-    assert result.exception is None
-    assert captured["custom_runtimes"] == ["mlserver_sklearn.SKLearnModel"]
+    assert result.exit_code == 2
+    assert "--allow-runtime requires --runtime-path" in result.output
+    assert "Built-in runtimes are always allowed by default" in result.output
 
 
 def test_build_allows_multiple_model_settings_when_all_custom_are_allowlisted(

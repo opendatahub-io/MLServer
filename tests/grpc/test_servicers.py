@@ -45,7 +45,7 @@ async def test_server_metadata(inference_service_stub):
 
     assert response.name == "mlserver"
     assert response.version == __version__
-    assert response.extensions == []
+    assert response.extensions == ["model_repository", "runtime_security"]
 
 
 async def test_model_metadata(inference_service_stub, sum_model_settings):

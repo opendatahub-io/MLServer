@@ -1,9 +1,12 @@
+import importlib
 import inspect
 import json
 import logging
 import os
 import re
+import sys
 import uuid
+from contextlib import contextmanager
 from functools import lru_cache
 
 from typing import (
@@ -94,26 +97,40 @@ def canonicalize_runtime_import_path(import_path: str) -> str:
     return _BUILTIN_RUNTIME_IMPORT_PATH_ALIASES.get(import_path, import_path)
 
 
-@lru_cache(maxsize=1)
-def _get_allowed_model_implementations() -> frozenset[str]:
-    image_baked = _load_image_baked_allowed_model_implementations(
+def log_runtime_security_mode() -> None:
+    """Log the runtime security mode at server startup."""
+    allowed = _load_image_baked_allowed_model_implementations(
         _get_trusted_runtimes_artifact_path()
     )
-    allowed = frozenset(ALLOWED_MODEL_IMPLEMENTATIONS.union(image_baked))
-    logger.debug(
-        "Trusted runtime allowlist loaded with %d entries.",
-        len(allowed),
-    )
-    return allowed
+
+    if allowed is not None:
+        # Locked mode: trusted runtimes allowlist file exists
+        if not allowed:
+            logger.warning(
+                "Trusted runtimes allowlist file exists but is empty - "
+                "no models can be loaded! Either add model implementation "
+                "entries or remove the file for unrestricted mode."
+            )
+        logger.info(
+            "Runtime security: LOCKED - %d model implementations allowed "
+            "from trusted runtimes allowlist file: %s",
+            len(allowed),
+            sorted(allowed),
+        )
+    else:
+        # Unrestricted mode: no trusted runtimes allowlist file exists
+        logger.info(
+            "Runtime security: UNRESTRICTED - all model implementations "
+            "allowed (no trusted runtimes allowlist file found)",
+        )
 
 
 def clear_trusted_runtime_caches() -> None:
-    """Clear trusted-runtime allowlist caches.
+    """Clear trusted runtimes allowlist cache.
 
-    Useful for tests or runtime reconfiguration where trusted-runtime sources
+    Useful for tests or runtime reconfiguration where trusted runtime sources
     may change during process lifetime.
     """
-    _get_allowed_model_implementations.cache_clear()
     _load_image_baked_allowed_model_implementations.cache_clear()
 
 
@@ -121,20 +138,62 @@ def _assert_trusted_runtime_import_path(import_path: str) -> None:
     if not is_valid_runtime_import_path(import_path):
         raise ValueError("Model implementation has an invalid import path.")
 
-    if import_path not in _get_allowed_model_implementations():
+    allowed = _load_image_baked_allowed_model_implementations(
+        _get_trusted_runtimes_artifact_path()
+    )
+
+    # If allowlist file does not exist, allow any runtime (unrestricted mode)
+    if allowed is None:
+        logger.debug(
+            "No trusted runtimes allowlist configured - "
+            "allowing model implementation %s",
+            import_path,
+        )
+        return
+
+    # If trusted runtimes allowlist file does exist, enforce allowlist (locked mode)
+    if import_path not in allowed:
         logger.warning(
             "Rejected untrusted model implementation %r.",
             import_path,
         )
         raise ValueError(
-            f"Model implementation {import_path!r} is not in the "
-            "allowlist of trusted runtimes."
+            f"Model implementation {import_path!r} is not included in the "
+            "trusted runtimes allowlist configuration."
         )
 
 
 # Conditionally imported due to cyclic dependencies
 if TYPE_CHECKING:
     from ..model import MLModel
+
+
+@contextmanager
+def _extra_sys_path(extra_path: str):
+    """Context manager to temporarily add a path to sys.path for dynamic imports.
+
+    This is used in unrestricted mode to allow loading custom runtimes from
+    model folders without requiring them to be installed packages.
+    """
+    sys.path.insert(0, extra_path)
+
+    yield
+
+    sys.path.remove(extra_path)
+
+
+def _reload_module(import_path: str):
+    """Reload a module to ensure fresh import in dynamic loading scenarios.
+
+    This is used in unrestricted mode when loading runtimes from model folders
+    to ensure we get the latest version of the module.
+    """
+    if not import_path:
+        return
+
+    module_path, _, _ = import_path.rpartition(".")
+    module = importlib.import_module(module_path)
+    importlib.reload(module)
 
 
 def _get_import_path(klass: Type):
@@ -149,9 +208,9 @@ def _get_trusted_runtimes_artifact_path() -> str:
 @lru_cache(maxsize=32)
 def _load_image_baked_allowed_model_implementations(
     artifact_path: str,
-) -> frozenset[str]:
+) -> Optional[frozenset[str]]:
     if not os.path.isfile(artifact_path):
-        return frozenset()
+        return None
 
     try:
         with open(artifact_path, "r", encoding="utf-8") as f:
@@ -523,6 +582,28 @@ class ModelSettings(BaseSettings):
         implementation = canonicalize_runtime_import_path(implementation)
         _assert_trusted_runtime_import_path(implementation)
         self.implementation_ = implementation
+
+        # Check if we're in unrestricted mode (no allowlist file)
+        allowed = _load_image_baked_allowed_model_implementations(
+            _get_trusted_runtimes_artifact_path()
+        )
+
+        # In unrestricted mode, support dynamic loading from model folder
+        if allowed is None and self._source:
+            # Get a nice path to the model's (disk) location
+            model_folder = os.path.dirname(self._source)
+
+            # Temporarily inject the model's module into the Python system path
+            logger.debug(
+                "Unrestricted mode: attempting dynamic load of %s from %s",
+                implementation,
+                model_folder,
+            )
+            with _extra_sys_path(model_folder):
+                _reload_module(implementation)
+                return import_string(implementation)  # type: ignore
+
+        # Locked mode or no source file: use standard import path only
         return import_string(implementation)  # type: ignore
 
     @implementation.setter

@@ -7,7 +7,7 @@ from typing import Optional, List
 from mlserver.repository.factory import ModelRepositoryFactory
 
 from .model import MLModel
-from .settings import Settings, ModelSettings
+from .settings import Settings, ModelSettings, log_runtime_security_mode
 from .logging import configure_logger
 from .registry import MultiModelRegistry
 from .handlers import DataPlane, ModelRepositoryHandlers
@@ -120,6 +120,17 @@ class MLServer:
             servers.append(self._kafka_server.start())
 
         servers_task = asyncio.gather(*servers)
+
+        try:
+            # Log runtime security mode before loading models
+            log_runtime_security_mode()
+        except Exception:
+            logger.exception("Failed to load trusted runtimes allowlist!")
+            try:
+                await self.stop()
+            finally:
+                await servers_task
+            return
 
         try:
             await asyncio.gather(

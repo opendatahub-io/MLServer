@@ -51,7 +51,7 @@ async def test_metadata(rest_client: AsyncClient):
 
     assert metadata.name == "mlserver"
     assert metadata.version == __version__
-    assert metadata.extensions == []
+    assert metadata.extensions == ["model_repository", "runtime_security"]
 
 
 async def test_openapi(rest_client: AsyncClient):
