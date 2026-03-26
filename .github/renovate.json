@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "baseBranchPatterns": [
+    "rhoai-staging"
+  ],
+  "enabledManagers": [
+    "dockerfile"
+  ],
+  "includePaths": [
+    "Dockerfile.konflux"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "enabled": false
+    },
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchFileNames": [
+        "Dockerfile.konflux"
+      ],
+      "matchDepNames": [
+        "quay.io/aipcc/base-images/cpu"
+      ],
+      "versioning": "semver",
+      "enabled": true
+    }
+  ]
+}
