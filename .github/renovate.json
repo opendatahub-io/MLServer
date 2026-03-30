@@ -9,9 +9,6 @@
   "enabledManagers": [
     "dockerfile"
   ],
-  "includePaths": [
-    "Dockerfile.konflux"
-  ],
   "packageRules": [
     {
       "matchManagers": [
@@ -22,6 +19,9 @@
     {
       "matchManagers": [
         "dockerfile"
+      ],
+      "matchBaseBranches": [
+        "rhoai-staging"
       ],
       "matchFileNames": [
         "Dockerfile.konflux"
