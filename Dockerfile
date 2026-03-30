@@ -1,8 +1,7 @@
-ARG BUILDER_BASE_IMAGE="registry.access.redhat.com/ubi9/ubi-minimal"
-ARG RUNTIME_BASE_IMAGE="registry.access.redhat.com/ubi9/ubi-minimal"
+ARG BASE_IMAGE="registry.access.redhat.com/ubi9/ubi-minimal"
 ARG RUNTIMES="lightgbm onnx sklearn xgboost"
 
-FROM ${BUILDER_BASE_IMAGE} AS wheel-builder
+FROM ${BASE_IMAGE} AS wheel-builder
 
 ARG RUNTIMES
 ARG POETRY_VERSION="2.1.1"
@@ -39,7 +38,7 @@ RUN pip install poetry==$POETRY_VERSION && \
         --format constraints.txt \
         -o /opt/mlserver/dist/constraints.txt
 
-FROM ${RUNTIME_BASE_IMAGE}
+FROM ${BASE_IMAGE}
 
 ARG RUNTIMES
 ARG PYTHON_VERSION=3.12
