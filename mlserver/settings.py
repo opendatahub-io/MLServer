@@ -103,25 +103,27 @@ def log_runtime_security_mode() -> None:
         _get_trusted_runtimes_artifact_path()
     )
 
-    if allowed is not None:
-        # Locked mode: trusted runtimes allowlist file exists
-        if not allowed:
-            logger.warning(
-                "Trusted runtimes allowlist file exists but is empty - "
-                "no models can be loaded! Either add model implementation "
-                "entries or remove the file for unrestricted mode."
-            )
+    # Development mode: no trusted runtimes allowlist file exists
+    if allowed is None:
         logger.info(
-            "Runtime security: LOCKED - %d model implementations allowed "
-            "from trusted runtimes allowlist file: %s",
-            len(allowed),
-            sorted(allowed),
+            "Runtime security: DEVELOPMENT - all model implementations "
+            "allowed (no trusted runtimes allowlist file found)"
         )
-    else:
-        # Unrestricted mode: no trusted runtimes allowlist file exists
-        logger.info(
-            "Runtime security: UNRESTRICTED - all model implementations "
-            "allowed (no trusted runtimes allowlist file found)",
+        return
+
+    # Production mode: trusted runtimes allowlist file exists
+    logger.info(
+        "Runtime security: PRODUCTION - %d model implementations allowed "
+        "from trusted runtimes allowlist file: %s",
+        len(allowed),
+        sorted(allowed),
+    )
+
+    if not allowed:
+        logger.warning(
+            "Trusted runtimes allowlist file exists but is empty - "
+            "no models can be loaded! Either add model implementation "
+            "entries or remove the file for development mode."
         )
 
 
@@ -142,7 +144,7 @@ def _assert_trusted_runtime_import_path(import_path: str) -> None:
         _get_trusted_runtimes_artifact_path()
     )
 
-    # If allowlist file does not exist, allow any runtime (unrestricted mode)
+    # If allowlist file does not exist, allow any runtime (development mode)
     if allowed is None:
         logger.debug(
             "No trusted runtimes allowlist configured - "
@@ -151,7 +153,7 @@ def _assert_trusted_runtime_import_path(import_path: str) -> None:
         )
         return
 
-    # If trusted runtimes allowlist file does exist, enforce allowlist (locked mode)
+    # If trusted runtimes allowlist file does exist, enforce allowlist (production mode)
     if import_path not in allowed:
         logger.warning(
             "Rejected untrusted model implementation %r.",
@@ -172,7 +174,7 @@ if TYPE_CHECKING:
 def _extra_sys_path(extra_path: str):
     """Context manager to temporarily add a path to sys.path for dynamic imports.
 
-    This is used in unrestricted mode to allow loading custom runtimes from
+    This is used in development mode to allow loading custom runtimes from
     model folders without requiring them to be installed packages.
     """
     sys.path.insert(0, extra_path)
@@ -185,7 +187,7 @@ def _extra_sys_path(extra_path: str):
 def _reload_module(import_path: str):
     """Reload a module to ensure fresh import in dynamic loading scenarios.
 
-    This is used in unrestricted mode when loading runtimes from model folders
+    This is used in development mode when loading runtimes from model folders
     to ensure we get the latest version of the module.
     """
     if not import_path:
@@ -458,6 +460,33 @@ class Settings(BaseSettings):
     gzip_enabled: bool = True
     """Enable GZipMiddleware."""
 
+    @model_validator(mode="after")
+    def validate_no_wildcard_cors_in_production_mode(self) -> Self:
+        """
+        Prevent wildcard CORS configurations in PRODUCTION mode.
+
+        Wildcard CORS origins allow any website to make cross-origin requests,
+        which is inappropriate for production deployments.
+        """
+        allowed = _load_image_baked_allowed_model_implementations(
+            _get_trusted_runtimes_artifact_path()
+        )
+
+        # Only enforce in PRODUCTION mode (when allowlist file exists)
+        if allowed is not None and self.cors_settings is not None:
+            if "*" in (self.cors_settings.allow_origins or []):
+                raise ValueError(
+                    "Wildcard CORS origins ['*'] not allowed in PRODUCTION mode. "
+                    "Specify explicit allowed origins or disable CORS settings."
+                )
+            if self.cors_settings.allow_origin_regex is not None:
+                raise ValueError(
+                    "CORS origin regex patterns not allowed in PRODUCTION mode. "
+                    "Specify explicit allowed origins or disable CORS settings."
+                )
+
+        return self
+
 
 class ModelParameters(BaseSettings):
     """
@@ -511,6 +540,37 @@ class ModelParameters(BaseSettings):
     def set_inference_pool_gid(self) -> Self:
         if self.autogenerate_inference_pool_gid and self.inference_pool_gid is None:
             self.inference_pool_gid = str(uuid.uuid4())
+        return self
+
+    @model_validator(mode="after")
+    def validate_no_custom_environments_in_production_mode(self) -> Self:
+        """
+        Prevent use of custom environments in PRODUCTION mode:
+        - environment_tarball: Prevents unsafe tarball extraction
+        - environment_path: Prevents sys.path injection attacks
+
+        In PRODUCTION mode (when trusted runtimes allowlist exists), all dependencies
+        must be pre-installed in the container image.
+        """
+        allowed = _load_image_baked_allowed_model_implementations(
+            _get_trusted_runtimes_artifact_path()
+        )
+
+        # Only enforce in PRODUCTION mode (when allowlist file exists)
+        if allowed is not None:
+            if self.environment_tarball is not None:
+                raise ValueError(
+                    "environment_tarball is not allowed in PRODUCTION mode. "
+                    "All dependencies must be pre-installed in the container image. "
+                    "Remove the trusted runtimes allowlist file to use custom envs."
+                )
+            if self.environment_path is not None:
+                raise ValueError(
+                    "environment_path is not allowed in PRODUCTION mode. "
+                    "All dependencies must be pre-installed in the container image. "
+                    "Remove the trusted runtimes allowlist file to use custom envs."
+                )
+
         return self
 
 
@@ -583,19 +643,19 @@ class ModelSettings(BaseSettings):
         _assert_trusted_runtime_import_path(implementation)
         self.implementation_ = implementation
 
-        # Check if we're in unrestricted mode (no allowlist file)
+        # Check if we're in development mode (no allowlist file)
         allowed = _load_image_baked_allowed_model_implementations(
             _get_trusted_runtimes_artifact_path()
         )
 
-        # In unrestricted mode, support dynamic loading from model folder
+        # In development mode, support dynamic loading from model folder
         if allowed is None and self._source:
             # Get a nice path to the model's (disk) location
             model_folder = os.path.dirname(self._source)
 
             # Temporarily inject the model's module into the Python system path
             logger.debug(
-                "Unrestricted mode: attempting dynamic load of %s from %s",
+                "Development mode: attempting dynamic load of %s from %s",
                 implementation,
                 model_folder,
             )
@@ -603,7 +663,7 @@ class ModelSettings(BaseSettings):
                 _reload_module(implementation)
                 return import_string(implementation)  # type: ignore
 
-        # Locked mode or no source file: use standard import path only
+        # Production mode or no source file: use standard import path only
         return import_string(implementation)  # type: ignore
 
     @implementation.setter

@@ -18,7 +18,7 @@ to load a _"default"_ model from these environment variables.
 
 MLServer operates in one of two security modes when loading custom runtimes:
 
-**LOCKED Mode (Production):**
+**PRODUCTION Mode (Production):**
 - Active when a trusted runtimes allowlist file exists in the image
 - MLServer validates `implementation` against this allowlist before importing
 - Built-in runtimes (e.g., `mlserver_sklearn.SKLearnModel`,
@@ -29,7 +29,7 @@ MLServer operates in one of two security modes when loading custom runtimes:
 - Directory paths must point to importable Python packages with `__init__.py`
 - The dotted `module.ClassName` format keeps declarations explicit
 
-**UNRESTRICTED Mode (Development):**
+**DEVELOPMENT Mode (Development):**
 - Active when no allowlist file exists (e.g., running `mlserver start` directly)
 - Custom runtimes are dynamically loaded from model folders at runtime
 - Simply place your custom runtime `.py` file next to `model-settings.json`
@@ -43,7 +43,7 @@ The validation applies regardless of whether `implementation` comes from
 
 If startup or model loading fails with:
 
-`Model implementation 'module.ClassName' is not in the allowlist of trusted runtimes.`
+`Model implementation 'module.ClassName' is not included in the trusted runtimes allowlist configuration.`
 
 check the following:
 
@@ -67,7 +67,7 @@ accidental execution of unexpected classes.
 
 You can inspect the current runtime security configuration through the
 `/v2/runtimes` REST endpoint or the `RuntimeSecurity` gRPC method. This returns
-the security mode (`LOCKED` or `UNRESTRICTED`) and, when in `LOCKED` mode, the
+the security mode (`PRODUCTION` or `DEVELOPMENT`) and, when in `PRODUCTION` mode, the
 list of allowed model implementations.
 
 **REST Example:**
@@ -76,11 +76,11 @@ list of allowed model implementations.
 curl http://localhost:8080/v2/runtimes
 ```
 
-**Response (LOCKED mode):**
+**Response (PRODUCTION mode):**
 
 ```json
 {
-  "mode": "LOCKED",
+  "mode": "PRODUCTION",
   "allowed_model_implementations": [
     "mlserver_sklearn.SKLearnModel",
     "mlserver_xgboost.XGBoostModel",
@@ -91,11 +91,11 @@ curl http://localhost:8080/v2/runtimes
 }
 ```
 
-**Response (UNRESTRICTED mode):**
+**Response (DEVELOPMENT mode):**
 
 ```json
 {
-  "mode": "UNRESTRICTED"
+  "mode": "DEVELOPMENT"
 }
 ```
 

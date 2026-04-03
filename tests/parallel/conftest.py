@@ -1,4 +1,35 @@
+"""
+Parallel inference tests configuration.
+
+IMPORTANT: These tests spawn worker processes using multiprocessing.Process.
+Some tests require DEVELOPMENT mode to use custom environments (environment_tarball).
+
+## How Workers Inherit Security Mode:
+
+Production:
+  - Workers read /etc/mlserver/trusted-runtimes.json (fixed path)
+  - Main process and workers naturally agree on PRODUCTION mode
+
+Tests:
+  - Test artifact is in random temp path (e.g., /tmp/trusted-runtimes-xyz.json)
+  - Main process uses monkeypatch to override path (in-memory, not inherited)
+  - Workers spawn as new processes, don't inherit monkeypatch
+  - Solution: Set TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV environment variable
+  - Workers' sitecustomize.py (see conftest.py) reads env var and overrides path
+
+## Test Isolation:
+
+These tests MUST run sequentially (not with pytest -n auto) because:
+  - Fixtures modify shared environment variable (TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV)
+  - Running in parallel would cause race conditions between tests
+  - tox.ini runs parallel tests separately without -n auto (safe)
+
+If you run manually: pytest tests/parallel/ (sequential, safe)
+DO NOT RUN: pytest tests/parallel/ -n auto (parallel, UNSAFE - race conditions)
+"""
+
 import asyncio
+import os
 import pytest
 
 from multiprocessing import Queue
@@ -20,6 +51,45 @@ from mlserver.parallel.messages import (
 )
 
 from ..fixtures import ErrorModel, EnvModel
+
+
+@pytest.fixture(autouse=True)
+def sync_development_mode_to_workers(request, tmp_path):
+    """Auto-sync development_mode fixture to spawned workers via env var.
+
+    When a test uses the development_mode fixture, this automatically propagates
+    DEVELOPMENT mode to spawned worker processes by setting the environment variable
+    that workers' sitecustomize.py reads.
+
+    This fixture runs automatically for all tests in tests/parallel/ but only modifies
+    the environment when development_mode is actually being used.
+
+    Why this is needed:
+    - Main process: development_mode fixture uses monkeypatch (in-memory only)
+    - Spawned workers: New processes that need real environment variables
+    - This bridges the gap by setting the env var workers need
+    """
+    from conftest import TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV
+
+    # Only set env var if test is using development_mode fixture
+    if "development_mode" not in request.fixturenames:
+        yield
+        return
+
+    # Point to non-existent file = DEVELOPMENT mode (no trusted-runtimes.json)
+    # Workers' sitecustomize.py reads this env var to override artifact path
+    non_existent = str(tmp_path / "does-not-exist.json")
+    original_env = os.environ.get(TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV)
+    os.environ[TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV] = non_existent
+
+    try:
+        yield
+    finally:
+        # Restore original env var
+        if original_env is not None:
+            os.environ[TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV] = original_env
+        else:
+            os.environ.pop(TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV, None)
 
 
 @pytest.fixture
@@ -153,7 +223,17 @@ def custom_request_message(sum_model_settings: ModelSettings) -> ModelRequestMes
 
 
 @pytest.fixture
-def env_model_settings(env_tarball: str) -> ModelSettings:
+def env_model_settings(development_mode, env_tarball: str) -> ModelSettings:
+    """Model settings with environment_tarball (requires DEVELOPMENT mode).
+
+    The development_mode fixture enables DEVELOPMENT mode for the main process.
+    The sync_development_mode_to_workers autouse fixture automatically propagates
+    this to spawned workers via environment variable.
+
+    Args:
+        development_mode: Fixture dependency (ensures DEVELOPMENT mode is active)
+        env_tarball: Path to environment tarball
+    """
     return ModelSettings(
         name="env-model",
         implementation=EnvModel,
@@ -162,18 +242,30 @@ def env_model_settings(env_tarball: str) -> ModelSettings:
 
 
 @pytest.fixture
-def existing_env_model_settings(env_tarball: str, tmp_path) -> ModelSettings:
+def existing_env_model_settings(
+    development_mode, env_tarball: str, tmp_path
+) -> ModelSettings:
+    """Model settings with environment_path (requires DEVELOPMENT mode).
+
+    The development_mode fixture enables DEVELOPMENT mode for the main process.
+    The sync_development_mode_to_workers autouse fixture automatically propagates
+    this to spawned workers via environment variable.
+
+    Args:
+        development_mode: Fixture dependency (ensures DEVELOPMENT mode is active)
+        env_tarball: Path to environment tarball
+        tmp_path: pytest tmp_path for extraction
+    """
     from mlserver.env import _extract_env
 
     env_path = str(tmp_path)
-
     _extract_env(env_tarball, env_path)
-    model_settings = ModelSettings(
+
+    return ModelSettings(
         name="exising_env_model",
         implementation=EnvModel,
         parameters=ModelParameters(environment_path=env_path),
     )
-    yield model_settings
 
 
 @pytest.fixture

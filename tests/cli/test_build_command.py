@@ -215,7 +215,7 @@ def test_build_fails_when_custom_runtime_source_path_missing(
         )
 
     assert result.exit_code == 2
-    assert "Missing runtime source paths" in result.output
+    assert "--allow-runtime requires --runtime-path" in result.output
 
 
 def test_build_fails_when_runtime_path_contains_whitespace(
@@ -306,7 +306,7 @@ def test_build_fails_when_runtime_path_is_given_without_allow_runtime(
         )
 
     assert result.exit_code == 2
-    assert "without custom allowlisted runtimes" in result.output
+    assert "--runtime-path requires --allow-runtime" in result.output
 
 
 @pytest.mark.parametrize("bad_path", ["-custom.py", "-custom"])
@@ -469,7 +469,13 @@ def test_build_fails_when_allow_runtime_format_is_invalid(
     _patch_build_pipeline(monkeypatch, cli_main, cli_build)
 
     with runner.isolated_filesystem():
-        result = _invoke_build(runner, cli_main, allow_runtimes=(invalid_runtime,))
+        _write_runtime_py("custom.py")
+        result = _invoke_build(
+            runner,
+            cli_main,
+            allow_runtimes=(invalid_runtime,),
+            runtime_paths=("custom.py",),
+        )
 
     assert result.exit_code == 2
     assert "Invalid --allow-runtime value(s)" in result.output

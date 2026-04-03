@@ -90,15 +90,15 @@ class DataPlane:
         )
 
         if allowed is not None:
-            # Locked mode: file exists
+            # Production mode: file exists
             return RuntimeSecurityResponse(
-                mode=RuntimeSecurityMode.LOCKED,
+                mode=RuntimeSecurityMode.PRODUCTION,
                 allowed_model_implementations=sorted(allowed),
             )
         else:
-            # Unrestricted mode: no file
+            # Development mode: no file
             return RuntimeSecurityResponse(
-                mode=RuntimeSecurityMode.UNRESTRICTED,
+                mode=RuntimeSecurityMode.DEVELOPMENT,
                 allowed_model_implementations=None,
             )
 

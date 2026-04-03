@@ -96,5 +96,5 @@ async def test_load_custom_module(
 async def test_load_untrusted_custom_module_rejected(
     untrusted_module_settings_path: str,
 ):
-    with pytest.raises(ValueError, match="allowlist of trusted runtimes"):
+    with pytest.raises(ValueError, match="trusted runtimes allowlist"):
         _ = load_model_settings(untrusted_module_settings_path).implementation

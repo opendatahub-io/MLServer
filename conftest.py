@@ -4,6 +4,23 @@ Root test configuration shared across both `tests/` and `runtimes/*` suites.
 This file must live at repository root so pytest applies the trusted-runtimes
 fixture to runtime-specific tests invoked from tox (e.g. `runtimes/sklearn`),
 which do not inherit from `tests/conftest.py`.
+
+## Test Mode Architecture
+
+**Global Default (PRODUCTION mode):**
+The pytest_configure hook sets up PRODUCTION mode globally for all tests by
+creating a trusted-runtimes.json artifact that includes:
+- All built-in runtimes (mlserver_sklearn, mlserver_xgboost, etc.)
+- Test-only fixtures (tests.fixtures.SumModel, etc.)
+
+This means tests run in PRODUCTION mode by default without needing any fixture.
+
+**Fixture Overrides:**
+Individual tests can override the global default using fixtures:
+- `development_mode` - Override to DEVELOPMENT mode (no runtime restrictions)
+- `empty_allowlist_mode` - Override to PRODUCTION mode with empty allowlist
+
+Tests that don't specify a fixture use the global PRODUCTION mode default.
 """
 
 import json
@@ -60,7 +77,62 @@ def clear_trusted_runtimes_caches_between_tests():
     _clear_trusted_runtimes_caches()
 
 
+@pytest.fixture
+def development_mode(monkeypatch, tmp_path):
+    """Override global PRODUCTION mode default to use DEVELOPMENT mode.
+
+    Points to a non-existent trusted-runtimes.json file, simulating DEVELOPMENT mode
+    where all runtimes are allowed and dynamic loading is permitted.
+
+    Use this fixture when you need to test development-mode-specific behavior.
+    """
+    non_existent = tmp_path / "does-not-exist.json"
+    monkeypatch.setattr(
+        mlserver_settings,
+        "_get_trusted_runtimes_artifact_path",
+        lambda: str(non_existent),
+    )
+    mlserver_settings.clear_trusted_runtime_caches()
+    yield
+    mlserver_settings.clear_trusted_runtime_caches()
+
+
+@pytest.fixture
+def empty_allowlist_mode(monkeypatch, tmp_path):
+    """Override global PRODUCTION mode default to use an empty allowlist.
+
+    Creates a trusted-runtimes.json file with an empty list, simulating PRODUCTION
+    mode where no runtimes are explicitly allowed (edge case for testing).
+
+    Use this fixture to test edge cases where the allowlist is empty.
+    """
+    artifact_path = tmp_path / "trusted-runtimes.json"
+    artifact_path.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(
+        mlserver_settings,
+        "_get_trusted_runtimes_artifact_path",
+        lambda: str(artifact_path),
+    )
+    mlserver_settings.clear_trusted_runtime_caches()
+    yield
+    mlserver_settings.clear_trusted_runtime_caches()
+
+
 def _configure_spawned_python_bootstrap() -> None:
+    """Configure sitecustomize.py to inject test configuration into spawned workers.
+
+    Problem: Spawned worker processes (multiprocessing.Process) don't inherit
+    in-memory monkeypatch changes from the parent process.
+
+    Solution: Create sitecustomize.py (Python's automatic startup hook) that:
+    1. Reads TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV environment variable
+    2. Overrides _get_trusted_runtimes_artifact_path() to return that path
+    3. Runs automatically in every spawned Python process (via PYTHONPATH)
+
+    This allows tests to control which trusted-runtimes.json file workers use
+    by setting the environment variable. Workers inherit environment variables
+    but not in-memory state, so this bridges the gap.
+    """
     global _TEST_BOOTSTRAP_DIR
     global _ORIGINAL_PYTHONPATH
     global _ORIGINAL_PYTHONHOME
@@ -114,6 +186,11 @@ def _cleanup_spawned_python_bootstrap() -> None:
 
 
 def _configure_test_trusted_runtimes_artifact() -> None:
+    """Create global trusted-runtimes.json artifact for PRODUCTION mode default.
+
+    This creates the artifact that all tests use by default (PRODUCTION mode with
+    comprehensive allowlist including built-in runtimes and test fixtures).
+    """
     global _TEST_TRUSTED_RUNTIMES_ARTIFACT_PATH
     test_allowed_model_implementations = (
         mlserver_settings.ALLOWED_MODEL_IMPLEMENTATIONS.union(
@@ -152,10 +229,17 @@ def _cleanup_test_trusted_runtimes_artifact() -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    # Run before test collection so import-time ModelSettings validations can use
-    # the test trusted-runtimes artifact.
-    # Ownership note: this root hook configures trusted-runtime state globally
-    # for both `tests/` and `runtimes/*` suites.
+    """Set up global PRODUCTION mode default for all tests.
+
+    This hook runs before test collection and configures PRODUCTION mode globally
+    by creating a trusted-runtimes.json artifact with all built-in runtimes and
+    test fixtures. This means:
+
+    - All tests run in PRODUCTION mode by default (no fixture needed)
+    - Individual tests can override using `development_mode` or `empty_allowlist_mode`
+    - Import-time ModelSettings validations work correctly
+    - Works for both `tests/` and `runtimes/*` test suites
+    """
     _configure_test_trusted_runtimes_artifact()
 
 

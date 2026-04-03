@@ -1,7 +1,7 @@
 DefaultBaseImage = "seldonio/mlserver:{version}-slim"
 
 DockerfileName = "Dockerfile"
-DockerfileTemplateUnrestricted = """
+DockerfileTemplateDevelopment = """
 FROM continuumio/miniconda3:24.4.0-0 AS env-builder
 SHELL ["/bin/bash", "-c"]
 
@@ -69,7 +69,7 @@ CMD source ./hack/activate-env.sh ./envs/base.tar.gz && \\
     mlserver start $MLSERVER_MODELS_DIR
 """
 
-DockerfileTemplateRestricted = """
+DockerfileTemplateProduction = """
 FROM continuumio/miniconda3:24.4.0-0 AS env-builder
 SHELL ["/bin/bash", "-c"]
 

@@ -103,26 +103,26 @@ allowlist. Use the image-scoped runtime workflow with `mlserver build`:
 **Building Images with Custom Runtimes:**
 
 ```bash
-# LOCKED mode (production): Allowlist specific custom runtimes
+# PRODUCTION mode (production): Allowlist specific custom runtimes
 mlserver build . -t my-image \
   --allow-runtime models.MyRuntime \
   --runtime-path models.py
 
-# UNRESTRICTED mode (development): Allow any runtime
-mlserver build . -t my-dev-image --allow-any-runtime
+# DEVELOPMENT mode (development): Allow any runtime
+mlserver build . -t my-dev-image --dev
 ```
 
 ### Runtime Security Modes
 
 MLServer operates in one of two security modes for loading custom runtimes:
 
-**LOCKED Mode (Production):**
+**PRODUCTION Mode (Production):**
 - Enforced when a trusted runtimes allowlist file exists in the image
 - Only explicitly allowlisted runtimes can be loaded
 - Custom runtimes must be baked into the image with `--allow-runtime` and `--runtime-path`
 - Provides strong security guarantees for production deployments
 
-**UNRESTRICTED Mode (Development):**
+**DEVELOPMENT Mode (Development):**
 - Active when no allowlist file exists (e.g., running `mlserver start` directly)
 - Supports dynamic loading of custom runtimes directly from model folders
 - Simply place your custom runtime `.py` file next to `model-settings.json`

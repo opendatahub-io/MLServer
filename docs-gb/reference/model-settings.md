@@ -36,7 +36,7 @@ classes before importing it.
 
 If startup or model loading fails with:
 
-`Model implementation 'module.ClassName' is not in the allowlist of trusted runtimes.`
+`Model implementation 'module.ClassName' is not included in the trusted runtimes allowlist configuration.`
 
 check the following:
 

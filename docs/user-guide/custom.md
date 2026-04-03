@@ -177,37 +177,37 @@ class CustomHeadersRuntime(MLModel):
 MLServer supports two modes for loading custom runtimes, depending on the
 runtime security configuration:
 
-### LOCKED Mode (Production)
+### PRODUCTION Mode (Production)
 
 When a trusted runtimes allowlist file exists (typically in production images),
-MLServer operates in LOCKED mode. In this mode, custom runtimes must be
+MLServer operates in PRODUCTION mode. In this mode, custom runtimes must be
 explicitly allowlisted and properly packaged into the image.
 
 ```{warning}
-For production deployments (LOCKED mode), custom runtimes must be present in the
+For production deployments (PRODUCTION mode), custom runtimes must be present in the
 trusted allowlist artifact used by the running image. Runtime import paths not
 in that allowlist are rejected at load time.
 ```
 
-### UNRESTRICTED Mode (Development)
+### DEVELOPMENT Mode (Development)
 
-When no trusted runtimes allowlist file exists, MLServer operates in UNRESTRICTED
+When no trusted runtimes allowlist file exists, MLServer operates in DEVELOPMENT
 mode. This mode is designed for local development and provides maximum convenience
 by supporting dynamic runtime loading directly from model folders.
 
 ```{note}
-In UNRESTRICTED mode, you can simply place your custom runtime code (e.g.,
+In DEVELOPMENT mode, you can simply place your custom runtime code (e.g.,
 `my_runtime.py`) next to your `model-settings.json` file, and MLServer will
 automatically discover and load it. No packaging or installation required!
 ```
 
 ```{warning}
-UNRESTRICTED mode is intended for development and testing only. It allows
+DEVELOPMENT mode is intended for development and testing only. It allows
 arbitrary code execution and should NEVER be used in production environments.
-Always use LOCKED mode (with `mlserver build`) for production deployments.
+Always use PRODUCTION mode (with `mlserver build`) for production deployments.
 ```
 
-**Example for UNRESTRICTED mode:**
+**Example for DEVELOPMENT mode:**
 
 ```bash
 # Simple development workflow - no Docker build needed
@@ -217,12 +217,12 @@ models/
       ├── my_runtime.py        # Your custom runtime code
       └── model.pkl
 
-# Start MLServer in unrestricted mode (no allowlist file)
+# Start MLServer in development mode (no allowlist file)
 mlserver start models/
 # Automatically loads my_runtime.py from model folder!
 ```
 
-For production deployments in LOCKED mode, continue reading below for the proper
+For production deployments in PRODUCTION mode, continue reading below for the proper
 packaging workflow.
 
 ### Verifying runtime allowlist configuration
@@ -236,7 +236,7 @@ was properly registered during image build.
 curl http://localhost:8080/v2/runtimes
 ```
 
-The response shows the security mode and, when in `LOCKED` mode, lists all
+The response shows the security mode and, when in `PRODUCTION` mode, lists all
 allowed model implementations. For more details and examples, see the
 [model-settings reference](../reference/model-settings.md#querying-runtime-security-configuration).
 
@@ -290,6 +290,16 @@ It is possible to load this custom set of dependencies by providing them
 through an [environment tarball](../examples/conda/README) or by giving a
 path to an already exisiting python environment. Both paths can be
 specified within your `model-settings.json` file.
+
+```{warning}
+**PRODUCTION Mode Restriction:**
+The `environment_tarball` and `environment_path` parameters are **ONLY available 
+in DEVELOPMENT mode**. In PRODUCTION mode (when a trusted runtimes allowlist exists), 
+these parameters will be rejected with an error. 
+
+For production deployments, all dependencies must be pre-installed in the container 
+image during the build process using a [Conda environment file or requirements.txt](#custom-environment).
+```
 
 ```{warning}
 To load a custom environment, [parallel inference](./parallel-inference)
@@ -378,11 +388,11 @@ as well as any custom environment, provided either through a [Conda environment
 file](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)
 or a `requirements.txt` file.
 
-### Build Modes: LOCKED vs UNRESTRICTED
+### Build Modes: PRODUCTION vs DEVELOPMENT
 
 You can build images in two different security modes:
 
-**LOCKED Mode (Recommended for Production):**
+**PRODUCTION Mode (Recommended for Production):**
 
 Build an image with a trusted runtimes allowlist. Only explicitly declared
 runtimes can be loaded at runtime.
@@ -399,13 +409,13 @@ mlserver build . -t my-custom-server \
 - Provides strong security guarantees for production
 - Default mode when using `--allow-runtime` / `--runtime-path`
 
-**UNRESTRICTED Mode (Development/Testing Only):**
+**DEVELOPMENT Mode (Development/Testing Only):**
 
 Build an image that allows any runtime to be loaded dynamically at runtime.
 
 ```bash
-# Build an unrestricted image (no allowlist)
-mlserver build . -t my-dev-server --allow-any-runtime
+# Build a development image (no allowlist)
+mlserver build . -t my-dev-server --dev
 ```
 
 - No trusted runtimes allowlist is created
@@ -414,19 +424,19 @@ mlserver build . -t my-dev-server --allow-any-runtime
 - **WARNING:** Should NEVER be used in production environments
 
 ```{warning}
-The `--allow-any-runtime` flag is mutually exclusive with `--allow-runtime` and
-`--runtime-path`. You must choose either LOCKED or UNRESTRICTED mode, not both.
+The `--dev` flag is mutually exclusive with `--allow-runtime` and
+`--runtime-path`. You must choose either PRODUCTION or DEVELOPMENT mode, not both.
 ```
 
 **Quick Reference:**
 
 | Build Command | Mode | Custom Runtime Loading | Production Use |
 |--------------|------|----------------------|----------------|
-| `mlserver build . -t image` | LOCKED | Built-in runtimes only | ✅ Yes |
-| `mlserver build . -t image --allow-runtime X --runtime-path x.py` | LOCKED | Built-in + allowlisted custom | ✅ Yes |
-| `mlserver build . -t image --allow-any-runtime` | UNRESTRICTED | Any runtime (dynamic) | ❌ No |
+| `mlserver build . -t image` | PRODUCTION | Built-in runtimes only | ✅ Yes |
+| `mlserver build . -t image --allow-runtime X --runtime-path x.py` | PRODUCTION | Built-in + allowlisted custom | ✅ Yes |
+| `mlserver build . -t image --dev` | DEVELOPMENT | Any runtime (dynamic) | ❌ No |
 
-### Building with Custom Runtimes (LOCKED Mode)
+### Building with Custom Runtimes (PRODUCTION Mode)
 
 ```{note}
 When using custom runtimes, pass the exact dotted Python
@@ -519,12 +529,12 @@ This `Dockerfile` can then be customised according to your needs.
 ```{note}
 The `mlserver dockerfile` command supports the same build modes as `mlserver build`:
 
-- **LOCKED mode:** Use `--allow-runtime` and `--runtime-path` to generate a
+- **PRODUCTION mode:** Use `--allow-runtime` and `--runtime-path` to generate a
   Dockerfile with a trusted runtimes allowlist
-- **UNRESTRICTED mode:** Use `--allow-any-runtime` to generate a Dockerfile
+- **DEVELOPMENT mode:** Use `--dev` to generate a Dockerfile
   without an allowlist (development only)
 
-For custom runtimes in LOCKED mode, pass `--allow-runtime module.ClassName`
+For custom runtimes in PRODUCTION mode, pass `--allow-runtime module.ClassName`
 and matching `--runtime-path` so the generated Dockerfile includes the
 allowlist and corresponding `COPY` / `PYTHONPATH` entries.
 ```

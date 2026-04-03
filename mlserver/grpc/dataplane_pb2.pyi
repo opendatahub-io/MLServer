@@ -203,12 +203,12 @@ class RuntimeSecurityResponse(google.protobuf.message.Message):
     MODE_FIELD_NUMBER: builtins.int
     ALLOWED_MODEL_IMPLEMENTATIONS_FIELD_NUMBER: builtins.int
     mode: typing.Text = ...
-    """Runtime security mode: "LOCKED" or "UNRESTRICTED"."""
+    """Runtime security mode: "PRODUCTION" or "DEVELOPMENT"."""
 
     @property
     def allowed_model_implementations(self) -> global___AllowedModelImplementations:
         """List of allowed model implementation import paths.
-        Only present when mode is "LOCKED", absent when "UNRESTRICTED".
+        Only present when mode is "PRODUCTION", absent when "DEVELOPMENT".
         """
         pass
 

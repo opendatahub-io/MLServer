@@ -82,17 +82,18 @@ class RuntimeSecurityResponseConverter:
         cls, type_object: types.RuntimeSecurityResponse
     ) -> pb.RuntimeSecurityResponse:
         # Wrap the list in the wrapper message if present, otherwise omit the field
+        # Note: use_enum_values=True means mode is already a str at runtime
         if type_object.allowed_model_implementations is not None:
             wrapper = pb.AllowedModelImplementations(
                 items=type_object.allowed_model_implementations
             )
             return pb.RuntimeSecurityResponse(
-                mode=type_object.mode.value,
+                mode=type_object.mode,  # type: ignore[arg-type]
                 allowed_model_implementations=wrapper,
             )
         else:
             return pb.RuntimeSecurityResponse(
-                mode=type_object.mode.value,
+                mode=type_object.mode,  # type: ignore[arg-type]
             )
 
 

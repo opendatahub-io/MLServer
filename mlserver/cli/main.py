@@ -30,6 +30,33 @@ def click_async(f):
     return wrapper
 
 
+def _validate_runtime_build_args(
+    dev: bool,
+    allow_runtime_import_paths: tuple[str, ...],
+    runtime_source_paths: tuple[str, ...],
+) -> None:
+    """
+    Validate mutual exclusivity and requirements for runtime build arguments.
+
+    Raises:
+        click.UsageError: If arguments are invalid or incompatible.
+    """
+    # Validate mutual exclusivity
+    if dev and (allow_runtime_import_paths or runtime_source_paths):
+        raise click.UsageError(
+            "--dev cannot be combined with --allow-runtime or --runtime-path"
+        )
+
+    # Require both flags together for custom runtimes
+    if allow_runtime_import_paths and not runtime_source_paths:
+        raise click.UsageError(
+            "--allow-runtime requires --runtime-path. "
+            "Built-in runtimes are always allowed by default."
+        )
+    if runtime_source_paths and not allow_runtime_import_paths:
+        raise click.UsageError("--runtime-path requires --allow-runtime.")
+
+
 @click.group()
 @click.version_option()
 def root():
@@ -77,11 +104,11 @@ async def start(folder: str):
     ),
 )
 @click.option(
-    "--allow-any-runtime",
+    "--dev",
     is_flag=True,
     default=False,
     help=(
-        "Build an unrestricted image that allows any runtime to be loaded. "
+        "Build a development image that allows any runtime to be loaded. "
         "Cannot be combined with --allow-runtime or --runtime-path."
     ),
 )
@@ -92,33 +119,19 @@ async def build(
     no_cache: bool = False,
     allow_runtime_import_paths: tuple[str, ...] = (),
     runtime_source_paths: tuple[str, ...] = (),
-    allow_any_runtime: bool = False,
+    dev: bool = False,
 ):
     """
     Build a Docker image for a custom MLServer runtime.
     """
-    # Validate mutual exclusivity
-    if allow_any_runtime and (allow_runtime_import_paths or runtime_source_paths):
-        raise click.UsageError(
-            "--allow-any-runtime cannot be combined with "
-            "--allow-runtime or --runtime-path"
-        )
-
-    # Require both flags together for custom runtimes
-    if allow_runtime_import_paths and not runtime_source_paths:
-        raise click.UsageError(
-            "--allow-runtime requires --runtime-path. "
-            "Built-in runtimes are always allowed by default."
-        )
-    if runtime_source_paths and not allow_runtime_import_paths:
-        raise click.UsageError("--runtime-path requires --allow-runtime.")
+    _validate_runtime_build_args(dev, allow_runtime_import_paths, runtime_source_paths)
 
     try:
         docker_build_context = DockerBuildContext.from_cli_args(
             folder,
             allow_runtime_import_paths,
             runtime_source_paths,
-            allow_any_runtime=allow_any_runtime,
+            dev,
         )
     except ValueError as exc:
         raise click.UsageError(str(exc)) from exc
@@ -167,11 +180,11 @@ async def init_project(template: str):
     ),
 )
 @click.option(
-    "--allow-any-runtime",
+    "--dev",
     is_flag=True,
     default=False,
     help=(
-        "Generate a Dockerfile for an unrestricted image that allows any runtime. "
+        "Generate a Dockerfile for a development image that allows any runtime. "
         "Cannot be combined with --allow-runtime or --runtime-path."
     ),
 )
@@ -181,33 +194,19 @@ async def dockerfile(
     include_dockerignore: bool,
     allow_runtime_import_paths: tuple[str, ...] = (),
     runtime_source_paths: tuple[str, ...] = (),
-    allow_any_runtime: bool = False,
+    dev: bool = False,
 ):
     """
     Generate a Dockerfile
     """
-    # Validate mutual exclusivity
-    if allow_any_runtime and (allow_runtime_import_paths or runtime_source_paths):
-        raise click.UsageError(
-            "--allow-any-runtime cannot be combined with "
-            "--allow-runtime or --runtime-path"
-        )
-
-    # Require both flags together for custom runtimes
-    if allow_runtime_import_paths and not runtime_source_paths:
-        raise click.UsageError(
-            "--allow-runtime requires --runtime-path. "
-            "Built-in runtimes are always allowed by default."
-        )
-    if runtime_source_paths and not allow_runtime_import_paths:
-        raise click.UsageError("--runtime-path requires --allow-runtime.")
+    _validate_runtime_build_args(dev, allow_runtime_import_paths, runtime_source_paths)
 
     try:
         docker_build_context = DockerBuildContext.from_cli_args(
             folder,
             allow_runtime_import_paths,
             runtime_source_paths,
-            allow_any_runtime=allow_any_runtime,
+            dev,
         )
     except ValueError as exc:
         raise click.UsageError(str(exc)) from exc

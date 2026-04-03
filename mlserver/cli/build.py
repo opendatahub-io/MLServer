@@ -28,8 +28,8 @@ from ._runtime_utils import (
 
 from .constants import (
     DockerfileName,
-    DockerfileTemplateUnrestricted,
-    DockerfileTemplateRestricted,
+    DockerfileTemplateDevelopment,
+    DockerfileTemplateProduction,
     DockerignoreName,
     Dockerignore,
     DefaultBaseImage,
@@ -134,28 +134,24 @@ def generate_dockerfile(
     custom_runtimes: Optional[list[str]] = None,
     runtime_paths: Optional[list[str]] = None,
     build_folder: Optional[str] = None,
-    allow_any_runtime: bool = False,
+    dev: bool = False,
 ) -> str:
     """Generate a Dockerfile with trusted runtime allowlist and copy steps."""
     base_image = base_image.format(version=__version__)
 
-    if allow_any_runtime:
-        # Unrestricted mode: no trusted runtimes allowlist file, no custom runtime paths
-        return DockerfileTemplateUnrestricted.format(base_image=base_image)
+    if dev:
+        # Development mode: no trusted runtimes allowlist file, no custom runtime paths
+        return DockerfileTemplateDevelopment.format(base_image=base_image)
 
-    # Restricted mode: create trusted runtimes allowlist file and handle custom paths
+    # Production mode: create trusted runtimes allowlist file and handle custom paths
     allow_runtime_import_paths = (
         normalise_runtime_import_paths(custom_runtimes) if custom_runtimes else []
     )
-    runtime_source_paths = (
-        _validate_and_normalise_runtime_source_paths(
-            runtime_paths,
-            allow_runtime_import_paths,
-            build_folder=build_folder,
-            cli_mode=False,
-        )
-        if runtime_paths
-        else []
+    runtime_source_paths = _validate_and_normalise_runtime_source_paths(
+        runtime_paths,
+        allow_runtime_import_paths,
+        build_folder=build_folder,
+        cli_mode=False,
     )
     # Always include default implementations plus any custom runtimes
     all_allowed = sorted(
@@ -176,7 +172,7 @@ def generate_dockerfile(
             'ENV PYTHONPATH="/opt/mlserver/custom_runtime:${PYTHONPATH}"'
         )
 
-    return DockerfileTemplateRestricted.format(
+    return DockerfileTemplateProduction.format(
         base_image=base_image,
         trusted_runtime_artifact_path=TRUSTED_RUNTIMES_ARTIFACT_PATH,
         trusted_runtime_allowlist_json=trusted_runtime_allowlist_json,
@@ -192,7 +188,7 @@ class DockerBuildContext:
     folder: str
     allow_runtime_import_paths: list[str]
     runtime_source_paths: list[str]
-    allow_any_runtime: bool
+    dev: bool
     dockerfile: str
 
     @classmethod
@@ -201,21 +197,21 @@ class DockerBuildContext:
         folder: str,
         allow_runtime_import_paths: tuple[str, ...],
         runtime_source_paths: tuple[str, ...],
-        allow_any_runtime: bool = False,
+        dev: bool = False,
     ) -> "DockerBuildContext":
         """Validate and build context from CLI arguments."""
-        if allow_any_runtime:
-            # Unrestricted mode: skip validation, generate simple Dockerfile
-            dockerfile = generate_dockerfile(allow_any_runtime=True)
+        if dev:
+            # Development mode: skip validation, generate simple Dockerfile
+            dockerfile = generate_dockerfile(dev=True)
             return cls(
                 folder=folder,
                 allow_runtime_import_paths=[],
                 runtime_source_paths=[],
-                allow_any_runtime=True,
+                dev=True,
                 dockerfile=dockerfile,
             )
 
-        # Restricted mode: validate and include custom runtimes
+        # Production mode: validate and include custom runtimes
         canonical_allow_runtime_import_paths = (
             _validate_and_normalise_allow_runtime_import_paths(
                 folder, allow_runtime_import_paths
@@ -235,13 +231,13 @@ class DockerBuildContext:
             custom_runtimes=canonical_allow_runtime_import_paths,
             runtime_paths=normalised_runtime_source_paths,
             build_folder=folder,
-            allow_any_runtime=False,
+            dev=False,
         )
         return cls(
             folder=folder,
             allow_runtime_import_paths=canonical_allow_runtime_import_paths,
             runtime_source_paths=normalised_runtime_source_paths,
-            allow_any_runtime=False,
+            dev=False,
             dockerfile=dockerfile,
         )
 

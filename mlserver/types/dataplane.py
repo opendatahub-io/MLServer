@@ -22,8 +22,8 @@ class MetadataServerErrorResponse(BaseModel):
 
 
 class RuntimeSecurityMode(Enum):
-    LOCKED = "LOCKED"
-    UNRESTRICTED = "UNRESTRICTED"
+    PRODUCTION = "PRODUCTION"
+    DEVELOPMENT = "DEVELOPMENT"
 
 
 class MetadataModelErrorResponse(BaseModel):
@@ -79,8 +79,7 @@ class Datatype(Enum):
 class RuntimeSecurityResponse(BaseModel):
     mode: RuntimeSecurityMode
     allowed_model_implementations: Optional[List[str]] = Field(
-        None,
-        description="List of allowed model implementation import paths when locked.",
+        None, description="Allowed model implementations (production mode only)."
     )
 
 

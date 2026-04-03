@@ -161,7 +161,7 @@
           }
         },
         "operationId": "runtime-security",
-        "description": "The runtime security endpoint provides information about the server's runtime security configuration, including which mode it's running in (LOCKED or UNRESTRICTED) and the list of allowed model implementations when in LOCKED mode."
+        "description": "The runtime security endpoint provides information about the server's runtime security configuration, including which mode it's running in (PRODUCTION or DEVELOPMENT) and the list of allowed model implementations when in PRODUCTION mode."
       }
     },
     "/v2/models/{model_name}/versions/{model_version}": {
@@ -980,7 +980,7 @@
             "items": {
               "type": "string"
             },
-            "description": "List of allowed model implementation import paths when locked."
+            "description": "Allowed model implementations (production mode only)."
           }
         },
         "required": [
@@ -992,8 +992,8 @@
         "type": "string",
         "description": "Runtime security mode values.",
         "enum": [
-          "LOCKED",
-          "UNRESTRICTED"
+          "PRODUCTION",
+          "DEVELOPMENT"
         ]
       },
       "MetadataTensor": {
