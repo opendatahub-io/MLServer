@@ -132,6 +132,10 @@ def load_model_settings_json(model_settings_path: Path) -> dict:
             "Invalid JSON in "
             f"{model_settings_path}:{exc.lineno}:{exc.colno} - {exc.msg}"
         ) from exc
+    except UnicodeError as exc:
+        raise ValueError(
+            f"Invalid encoding in {model_settings_path}: expected UTF-8."
+        ) from exc
     except OSError as exc:
         raise ValueError(
             f"Could not read {model_settings_path}: {exc.strerror or str(exc)}"

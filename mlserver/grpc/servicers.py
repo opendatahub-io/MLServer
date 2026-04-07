@@ -58,6 +58,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
         metadata = await self._data_plane.metadata()
         return ServerMetadataResponseConverter.from_types(metadata)
 
+    @handle_mlserver_error
     async def RuntimeSecurity(
         self, request: pb.RuntimeSecurityRequest, context
     ) -> pb.RuntimeSecurityResponse:

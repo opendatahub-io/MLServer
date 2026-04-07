@@ -192,7 +192,7 @@ automatically discover and load it. No packaging or installation required!
 {% hint style="warning" %}
 DEVELOPMENT mode is intended for development and testing only. It allows
 arbitrary code execution and should NEVER be used in production environments.
-Always use PRODUCTION mode (with `mlserver build`) for production deployments.
+Always use PRODUCTION mode (production-mode images or Dockerfiles) for production deployments.
 {% endhint %}
 
 **Example for DEVELOPMENT mode:**

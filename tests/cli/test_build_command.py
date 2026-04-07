@@ -28,6 +28,7 @@ def _patch_build_pipeline(monkeypatch, cli_main, cli_build, captured=None):
         if captured is not None:
             captured["custom_runtimes"] = kwargs.get("custom_runtimes")
             captured["runtime_paths"] = kwargs.get("runtime_paths")
+            captured["dev"] = kwargs.get("dev")
         return "FROM test"
 
     def _fake_build_image(folder, dockerfile, image_tag, no_cache):
@@ -62,8 +63,12 @@ def _write_runtime_package(path: str, init_content: str = ""):
     (package_dir / "__init__.py").write_text(init_content, encoding="utf-8")
 
 
-def _invoke_build(runner: CliRunner, cli_main, allow_runtimes=(), runtime_paths=()):
+def _invoke_build(
+    runner: CliRunner, cli_main, allow_runtimes=(), runtime_paths=(), dev=False
+):
     args = ["build", ".", "-t", DEFAULT_IMAGE_TAG]
+    if dev:
+        args.append("--dev")
     for runtime in allow_runtimes:
         args.extend(["--allow-runtime", runtime])
     for runtime_path in runtime_paths:
@@ -73,9 +78,11 @@ def _invoke_build(runner: CliRunner, cli_main, allow_runtimes=(), runtime_paths=
 
 
 def _invoke_dockerfile(
-    runner: CliRunner, cli_main, allow_runtimes=(), runtime_paths=()
+    runner: CliRunner, cli_main, allow_runtimes=(), runtime_paths=(), dev=False
 ):
     args = ["dockerfile", "."]
+    if dev:
+        args.append("--dev")
     for runtime in allow_runtimes:
         args.extend(["--allow-runtime", runtime])
     for runtime_path in runtime_paths:
@@ -150,23 +157,6 @@ def test_build_accepts_legacy_builtin_implementation_without_allow_runtime(
     assert result.exit_code == 0
     assert result.exception is None
     assert captured["custom_runtimes"] == []
-
-
-def test_build_rejects_allow_runtime_without_runtime_path(
-    monkeypatch, cli_main, cli_build, runner
-):
-    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
-
-    with runner.isolated_filesystem():
-        result = _invoke_build(
-            runner,
-            cli_main,
-            allow_runtimes=("mlserver_sklearn.SKLearnModel",),
-        )
-
-    assert result.exit_code == 2
-    assert "--allow-runtime requires --runtime-path" in result.output
-    assert "Built-in runtimes are always allowed by default" in result.output
 
 
 def test_build_allows_multiple_model_settings_when_all_custom_are_allowlisted(
@@ -676,3 +666,235 @@ def test_dockerfile_wraps_generate_dockerfile_value_error_as_usage_error(
 
     assert result.exit_code == 2
     assert "sink boom" in result.output
+
+
+def test_build_dev_succeeds(monkeypatch, cli_main, cli_build, runner):
+    """Test --dev builds successfully without runtime flags."""
+    captured = {}
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build, captured)
+
+    with runner.isolated_filesystem():
+        result = _invoke_build(runner, cli_main, dev=True)
+
+    assert result.exit_code == 0
+    assert result.exception is None
+    assert captured["dev"] is True
+    assert captured.get("custom_runtimes") is None
+    assert captured["image_tag"] == DEFAULT_IMAGE_TAG
+
+
+def test_build_dev_rejects_allow_runtime(monkeypatch, cli_main, cli_build, runner):
+    """Test --dev cannot be combined with --allow-runtime."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        result = _invoke_build(
+            runner, cli_main, dev=True, allow_runtimes=("custom.Runtime",)
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "--dev cannot be combined with --allow-runtime or --runtime-path"
+        in result.output
+    )
+
+
+def test_build_dev_rejects_runtime_path(monkeypatch, cli_main, cli_build, runner):
+    """Test --dev cannot be combined with --runtime-path."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("custom.py")
+        result = _invoke_build(runner, cli_main, dev=True, runtime_paths=("custom.py",))
+
+    assert result.exit_code == 2
+    assert (
+        "--dev cannot be combined with --allow-runtime or --runtime-path"
+        in result.output
+    )
+
+
+def test_dockerfile_dev_succeeds(monkeypatch, cli_main, cli_build, runner):
+    """Test dockerfile --dev generates successfully without runtime flags."""
+    captured = {}
+
+    def _fake_generate_dockerfile(*args, **kwargs):
+        captured["custom_runtimes"] = kwargs.get("custom_runtimes")
+        captured["dev"] = kwargs.get("dev")
+        return "FROM test"
+
+    def _fake_write_dockerfile(folder, dockerfile, include_dockerignore):
+        captured["folder"] = folder
+        captured["dockerfile"] = dockerfile
+        return "Dockerfile"
+
+    monkeypatch.setattr(cli_build, "generate_dockerfile", _fake_generate_dockerfile)
+    monkeypatch.setattr(cli_main, "write_dockerfile", _fake_write_dockerfile)
+
+    with runner.isolated_filesystem():
+        result = _invoke_dockerfile(runner, cli_main, dev=True)
+
+    assert result.exit_code == 0
+    assert result.exception is None
+    assert captured["dev"] is True
+    assert captured.get("custom_runtimes") is None
+    assert captured["folder"] == "."
+    assert captured["dockerfile"] == "FROM test"
+
+
+def test_dockerfile_dev_rejects_allow_runtime(monkeypatch, cli_main, cli_build, runner):
+    """Test dockerfile --dev cannot be combined with --allow-runtime."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        result = _invoke_dockerfile(
+            runner, cli_main, dev=True, allow_runtimes=("custom.Runtime",)
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "--dev cannot be combined with --allow-runtime or --runtime-path"
+        in result.output
+    )
+
+
+def test_dockerfile_dev_rejects_runtime_path(monkeypatch, cli_main, cli_build, runner):
+    """Test dockerfile --dev cannot be combined with --runtime-path."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("custom.py")
+        result = _invoke_dockerfile(
+            runner, cli_main, dev=True, runtime_paths=("custom.py",)
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "--dev cannot be combined with --allow-runtime or --runtime-path"
+        in result.output
+    )
+
+
+def test_build_rejects_builtin_runtime_with_allow_runtime(
+    monkeypatch, cli_main, cli_build, runner
+):
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("mlserver_sklearn.py")
+        result = _invoke_build(
+            runner,
+            cli_main,
+            allow_runtimes=("mlserver_sklearn.SKLearnModel",),
+            runtime_paths=("mlserver_sklearn.py",),
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "Built-in runtime(s) 'mlserver_sklearn.SKLearnModel' cannot be specified"
+        in result.output
+    )
+    assert "use a different module name" in result.output
+
+
+def test_build_rejects_legacy_builtin_runtime_with_allow_runtime(
+    monkeypatch, cli_main, cli_build, runner
+):
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("mlserver_sklearn.py")
+        result = _invoke_build(
+            runner,
+            cli_main,
+            allow_runtimes=("mlserver_sklearn.sklearn.SKLearnModel",),
+            runtime_paths=("mlserver_sklearn.py",),
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "Built-in runtime(s) 'mlserver_sklearn.sklearn.SKLearnModel' "
+        "cannot be specified" in result.output
+    )
+    assert "use a different module name" in result.output
+
+
+def test_dockerfile_rejects_builtin_runtime_with_allow_runtime(
+    monkeypatch, cli_main, cli_build, runner
+):
+    """Test dockerfile rejects built-in runtimes specified with --allow-runtime."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("mlserver_sklearn.py")
+        result = _invoke_dockerfile(
+            runner,
+            cli_main,
+            allow_runtimes=("mlserver_sklearn.SKLearnModel",),
+            runtime_paths=("mlserver_sklearn.py",),
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "Built-in runtime(s) 'mlserver_sklearn.SKLearnModel' cannot be specified"
+        in result.output
+    )
+    assert "use a different module name" in result.output
+
+
+def test_dockerfile_rejects_legacy_builtin_runtime_with_allow_runtime(
+    monkeypatch, cli_main, cli_build, runner
+):
+    """Test dockerfile rejects legacy built-in runtime paths with --allow-runtime."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("mlserver_sklearn.py")
+        result = _invoke_dockerfile(
+            runner,
+            cli_main,
+            allow_runtimes=("mlserver_sklearn.sklearn.SKLearnModel",),
+            runtime_paths=("mlserver_sklearn.py",),
+        )
+
+    assert result.exit_code == 2
+    assert (
+        "Built-in runtime(s) 'mlserver_sklearn.sklearn.SKLearnModel' "
+        "cannot be specified" in result.output
+    )
+    assert "use a different module name" in result.output
+
+
+def test_dockerfile_fails_when_custom_runtime_source_path_missing(
+    monkeypatch, cli_main, cli_build, runner
+):
+    """Test dockerfile requires --runtime-path when --allow-runtime is specified."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        result = _invoke_dockerfile(
+            runner,
+            cli_main,
+            allow_runtimes=("custom.Runtime",),
+        )
+
+    assert result.exit_code == 2
+    assert "--allow-runtime requires --runtime-path" in result.output
+
+
+def test_dockerfile_fails_when_runtime_path_is_given_without_allow_runtime(
+    monkeypatch, cli_main, cli_build, runner
+):
+    """Test dockerfile requires --allow-runtime when --runtime-path is specified."""
+    _patch_build_pipeline(monkeypatch, cli_main, cli_build)
+
+    with runner.isolated_filesystem():
+        _write_runtime_py("custom.py")
+        result = _invoke_dockerfile(
+            runner,
+            cli_main,
+            runtime_paths=("custom.py",),
+        )
+
+    assert result.exit_code == 2
+    assert "--runtime-path requires --allow-runtime" in result.output

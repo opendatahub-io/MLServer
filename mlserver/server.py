@@ -112,6 +112,14 @@ class MLServer:
             self._kafka_server = KafkaServer(self._settings, self._data_plane)
 
     async def start(self, models_settings: List[ModelSettings] = []):
+        # Validate runtime security configuration before starting servers to prevent
+        # a window where endpoints are accessible but security hasn't been verified
+        try:
+            log_runtime_security_mode()
+        except Exception:
+            logger.exception("Failed to load trusted runtimes allowlist!")
+            return
+
         servers = [self._rest_server.start(), self._grpc_server.start()]
         if self._metrics_server:
             servers.append(self._metrics_server.start())
@@ -120,17 +128,6 @@ class MLServer:
             servers.append(self._kafka_server.start())
 
         servers_task = asyncio.gather(*servers)
-
-        try:
-            # Log runtime security mode before loading models
-            log_runtime_security_mode()
-        except Exception:
-            logger.exception("Failed to load trusted runtimes allowlist!")
-            try:
-                await self.stop()
-            finally:
-                await servers_task
-            return
 
         try:
             await asyncio.gather(

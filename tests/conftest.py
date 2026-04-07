@@ -137,7 +137,7 @@ def add_tests_path_to_sys_path():
         sys.path.append(TESTS_PATH)
         added = True
     yield
-    if added:
+    if added and TESTS_PATH in sys.path:
         sys.path.remove(TESTS_PATH)
 
 

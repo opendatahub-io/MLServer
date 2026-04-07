@@ -178,10 +178,13 @@ def _extra_sys_path(extra_path: str):
     model folders without requiring them to be installed packages.
     """
     sys.path.insert(0, extra_path)
-
-    yield
-
-    sys.path.remove(extra_path)
+    try:
+        yield
+    finally:
+        try:
+            sys.path.remove(extra_path)
+        except ValueError:
+            pass
 
 
 def _reload_module(import_path: str):
@@ -211,8 +214,12 @@ def _get_trusted_runtimes_artifact_path() -> str:
 def _load_image_baked_allowed_model_implementations(
     artifact_path: str,
 ) -> Optional[frozenset[str]]:
-    if not os.path.isfile(artifact_path):
+    if not os.path.lexists(artifact_path):
         return None
+    if not os.path.isfile(artifact_path):
+        raise ValueError(
+            f"Trusted runtimes artifact {artifact_path!r} must be a regular file."
+        )
 
     try:
         with open(artifact_path, "r", encoding="utf-8") as f:

@@ -267,10 +267,13 @@ def _build_docker_command(
     dockerfile_path: str,
     image_tag: str,
     no_cache: bool = False,
-) -> str:
-    """Build docker build command string."""
-    cache_flag = "--no-cache " if no_cache else ""
-    return f"docker build --rm {cache_flag}{folder} -f {dockerfile_path} -t {image_tag}"
+) -> list[str]:
+    """Build docker build command argv."""
+    command = ["docker", "build", "--rm"]
+    if no_cache:
+        command.append("--no-cache")
+    command.extend(["-f", dockerfile_path, "-t", image_tag, folder])
+    return command
 
 
 def build_image(
@@ -283,6 +286,6 @@ def build_image(
         build_cmd = _build_docker_command(folder, dockerfile_path, image_tag, no_cache)
         build_env = os.environ.copy()
         build_env["DOCKER_BUILDKIT"] = "1"
-        subprocess.run(build_cmd, check=True, shell=True, env=build_env)
+        subprocess.run(build_cmd, check=True, shell=False, env=build_env)
 
     return image_tag

@@ -128,15 +128,30 @@ async def test_infer(
     assert len(response.outputs) == 1
 
 
-@pytest.mark.usefixtures("mlserver_start_custom_module")
 async def test_custom_module_fails_closed(
+    mlserver_start_custom_module: Popen,
     rest_client: RESTClient,
     sum_model_settings: ModelSettings,
 ):
-    # Fail closed when runtime points to a non-importable model-folder module.
+    # Fail closed when runtime points to a non-allowlisted model-folder module.
+    # This also proves spawned workers (parallel_workers=2) are in PRODUCTION mode
+    # with the allowlist enforced. If worker bootstrap failed and workers degraded
+    # to DEVELOPMENT mode, custom.SumModel would load successfully.
+    # See: test_spawned_workers_load_allowlisted_runtime_via_bootstrap (positive test)
     await rest_client.wait_until_live()
     with pytest.raises(ClientResponseError):
         await rest_client.wait_until_model_ready(sum_model_settings.name)
+
+
+async def test_custom_module_loads_in_development_mode(
+    development_mode,
+    mlserver_start_custom_module: Popen,
+    rest_client: RESTClient,
+    sum_model_settings: ModelSettings,
+):
+    # In DEVELOPMENT mode, custom.SumModel should load successfully
+    await rest_client.wait_until_live()
+    await rest_client.wait_until_model_ready(sum_model_settings.name)
 
 
 @pytest.mark.usefixtures("mlserver_start_sum_model")
@@ -146,8 +161,12 @@ async def test_spawned_workers_load_allowlisted_runtime_via_bootstrap(
     sum_model_settings: ModelSettings,
 ):
     # This verifies the trusted-runtime bootstrap is applied inside spawned
-    # worker processes (parallel_workers > 0). Without that bootstrap, runtime
-    # `tests.fixtures.SumModel` would be rejected by worker-side validation.
+    # worker processes (parallel_workers > 0). Without that bootstrap, workers
+    # would fall back to DEVELOPMENT mode and accept any runtime.
+    #
+    # Positive test: allowlisted runtime loads successfully in workers.
+    # For proof that workers are in PRODUCTION mode (not DEVELOPMENT fallback),
+    # see: test_custom_module_fails_closed (negative test - rejects non-allowlisted)
     assert settings.parallel_workers > 0
     await rest_client.wait_until_live()
     await rest_client.wait_until_model_ready(sum_model_settings.name)

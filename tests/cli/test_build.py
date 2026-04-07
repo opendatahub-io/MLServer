@@ -250,6 +250,25 @@ def test_generate_dockerfile_rejects_unsafe_runtime_paths(unsafe_path: str):
         )
 
 
+def test_generate_dockerfile_dev_mode():
+    """Test --dev flag generates Dockerfile without allowlist."""
+    dockerfile = generate_dockerfile(dev=True)
+
+    # Should NOT contain PRODUCTION mode artifacts
+    assert TRUSTED_RUNTIMES_ARTIFACT_PATH not in dockerfile
+    # Should NOT contain custom runtime placeholders
+    assert "{custom_runtime_copy_instructions}" not in dockerfile
+    assert "{custom_runtime_pythonpath_env}" not in dockerfile
+    assert "{trusted_runtime_allowlist_json}" not in dockerfile
+
+    # Should have base image
+    expected_base = DefaultBaseImage.format(version=__version__)
+    assert expected_base in dockerfile
+
+    # Should have standard CMD
+    assert "mlserver start" in dockerfile
+
+
 def test_build(docker_client: DockerClient, custom_image: str):
     image = docker_client.images.get(custom_image)
     assert image.tags == [custom_image]

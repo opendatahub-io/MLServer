@@ -87,6 +87,12 @@ def development_mode(monkeypatch, tmp_path):
     Use this fixture when you need to test development-mode-specific behavior.
     """
     non_existent = tmp_path / "does-not-exist.json"
+    # Set env var for spawned processes (read by sitecustomize.py)
+    monkeypatch.setenv(
+        TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV,
+        str(non_existent),
+    )
+    # Set in-process override for current test
     monkeypatch.setattr(
         mlserver_settings,
         "_get_trusted_runtimes_artifact_path",
@@ -108,6 +114,12 @@ def empty_allowlist_mode(monkeypatch, tmp_path):
     """
     artifact_path = tmp_path / "trusted-runtimes.json"
     artifact_path.write_text("[]", encoding="utf-8")
+    # Set env var for spawned processes (read by sitecustomize.py)
+    monkeypatch.setenv(
+        TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV,
+        str(artifact_path),
+    )
+    # Set in-process override for current test
     monkeypatch.setattr(
         mlserver_settings,
         "_get_trusted_runtimes_artifact_path",

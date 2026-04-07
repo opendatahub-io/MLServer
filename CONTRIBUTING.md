@@ -22,54 +22,7 @@ Installation for Contributing
 
 Running Tests
 ------------
-
-**Recommended approach:** Use `make test` or `tox` to run the full test suite. These commands handle test isolation and execution order correctly.
-
-```bash
-# Run all tests (recommended)
-make test
-
-# Or using tox directly
-tox -e mlserver
-```
-
-### Running Tests Manually
-
-If running tests manually with pytest, be aware of these constraints:
-
-**Most tests - use parallel execution:**
-```bash
-# Run main test suite (excludes special test directories)
-pytest tests/ -n auto \
-  --ignore=tests/metrics \
-  --ignore=tests/kafka \
-  --ignore=tests/parallel \
-  --ignore=tests/grpc \
-  --ignore=tests/env \
-  --ignore=tests/cli
-```
-
-**Special test suites - run separately (sequential):**
-```bash
-# ✅ Correct - run individually without -n auto
-pytest tests/metrics/
-pytest tests/kafka
-pytest tests/parallel/
-pytest tests/grpc/
-pytest tests/env/
-pytest tests/cli/
-
-# ❌ Incorrect - mixing with other tests or using -n auto
-pytest tests/  # Mixes special tests with main suite
-pytest tests/parallel/ -n auto  # Race conditions
-```
-
-**Why these run separately:**
-- `tests/parallel/` - Spawns worker processes, modifies environment variables (race conditions with `-n auto`)
-- `tests/kafka/` - Requires Docker daemon running
-- `tests/metrics/`, `tests/grpc/`, `tests/env/`, `tests/cli/` - Flaky when run in parallel with main test suite
-
-See `tox.ini` for how test isolation is handled in the official test suite.
+Use `make test` or `tox -e mlserver` to run the test suite. These commands handle test isolation and execution order correctly. See `tox.ini` for details on how different test suites are run.
 
 Raising a PR
 ------------

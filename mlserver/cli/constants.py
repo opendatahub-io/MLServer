@@ -165,6 +165,10 @@ bin
 .metrics
 .envs
 
+# Keep repo content from replacing image-owned bootstrap code / generated envs
+/hack/
+/envs/
+
 # Mac file system
 **/.DS_Store
 

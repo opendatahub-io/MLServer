@@ -21,9 +21,10 @@ MLServer operates in one of two security modes when loading custom runtimes:
 **PRODUCTION Mode (Production):**
 - Active when a trusted runtimes allowlist file exists in the image
 - MLServer validates `implementation` against this allowlist before importing
-- Built-in runtimes (e.g., `mlserver_sklearn.SKLearnModel`,
+- Images built via `mlserver build` or `mlserver dockerfile` automatically include
+  built-in runtimes (e.g., `mlserver_sklearn.SKLearnModel`,
   `mlserver_xgboost.XGBoostModel`, `mlserver_lightgbm.LightGBMModel`,
-  `mlserver_onnx.OnnxModel`) are always allowlisted
+  `mlserver_onnx.OnnxModel`) in the allowlist
 - Custom runtimes require `--allow-runtime module.ClassName` and matching
   `--runtime-path` during image build
 - Directory paths must point to importable Python packages with `__init__.py`

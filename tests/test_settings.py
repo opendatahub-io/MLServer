@@ -669,33 +669,33 @@ def test_model_settings_builtin_runtime_allowed_in_development_mode(development_
     assert model_settings.implementation_ == "mlserver_sklearn.SKLearnModel"
 
 
-def test_model_settings_dynamic_loading_from_model_folder(development_mode, tmp_path):
-    """Test that dynamic loading from model folder works in DEVELOPMENT mode.
+def test_dynamic_loading_actually_imports_from_model_folder(development_mode, tmp_path):
+    """Test that dynamic loading actually imports runtime from model folder.
 
-    Dynamic loading of runtimes from the model folder should only work in
-    DEVELOPMENT mode (not PRODUCTION).
+    This tests the _extra_sys_path() mechanism with real imports, not mocks.
+    Requires loading from file (_source must be set) to trigger dynamic loading.
     """
-    # Create a model folder with a custom runtime module
+    # Create model folder with custom runtime
     model_folder = tmp_path / "my_model"
     model_folder.mkdir()
 
-    # Create a simple custom runtime module
-    runtime_file = model_folder / "my_runtime.py"
-    runtime_file.write_text(
-        "class CustomRuntime:\n    pass\n",
+    (model_folder / "custom_runtime.py").write_text(
+        "from mlserver import MLModel\nclass MyRuntime(MLModel): pass\n",
         encoding="utf-8",
     )
 
-    # In DEVELOPMENT mode, we should be able to specify a runtime
-    # that will be loaded dynamically from the model folder
-    model_settings = ModelSettings(
-        name="test-model",
-        implementation="my_runtime.CustomRuntime",
+    (model_folder / "model-settings.json").write_text(
+        '{"name": "test-model", "implementation": "custom_runtime.MyRuntime"}',
+        encoding="utf-8",
     )
 
-    # The implementation should be set (actual dynamic loading happens at runtime,
-    # not during validation in DEVELOPMENT mode)
-    assert model_settings.implementation_ == "my_runtime.CustomRuntime"
+    # Load from file (sets _source, required for dynamic loading)
+    model_settings = ModelSettings.parse_file(str(model_folder / "model-settings.json"))
+
+    # Trigger actual dynamic loading via .implementation property
+    runtime_class = model_settings.implementation
+    assert runtime_class.__name__ == "MyRuntime"
+    assert runtime_class.__module__ == "custom_runtime"
 
 
 def test_is_valid_runtime_import_path_valid():

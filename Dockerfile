@@ -1,5 +1,6 @@
 ARG BASE_IMAGE="registry.access.redhat.com/ubi9/ubi-minimal"
 ARG RUNTIMES="lightgbm onnx sklearn xgboost"
+# Space-separated list of runtime import paths
 ARG TRUSTED_RUNTIMES="mlserver_lightgbm.LightGBMModel mlserver_onnx.OnnxModel mlserver_sklearn.SKLearnModel mlserver_xgboost.XGBoostModel"
 
 FROM ${BASE_IMAGE} AS wheel-builder
@@ -93,18 +94,24 @@ COPY ./licenses/license.txt .
 COPY ./licenses/license.txt /licenses/
 
 # Generate trusted-runtimes.json with only installed runtimes
-RUN set -eu; \
-    runtimes_json="["; \
-    separator=""; \
-    for impl in $TRUSTED_RUNTIMES; do \
-        runtimes_json="${runtimes_json}${separator}\"${impl}\""; \
-        separator=","; \
-    done; \
-    runtimes_json="${runtimes_json}]"; \
-    mkdir -p /etc/mlserver; \
-    echo "$runtimes_json" > /etc/mlserver/trusted-runtimes.json; \
-    chmod 0444 /etc/mlserver/trusted-runtimes.json; \
-    chmod 0555 /etc/mlserver
+RUN env TRUSTED_RUNTIMES="$TRUSTED_RUNTIMES" python3 <<'EOF'
+import json, os, sys
+from pathlib import Path
+from mlserver.settings import is_valid_runtime_import_path
+
+runtimes = os.environ.get("TRUSTED_RUNTIMES", "").split()
+invalid = [r for r in runtimes if not is_valid_runtime_import_path(r)]
+if invalid:
+    print(f"Invalid runtime import path(s): {invalid}", file=sys.stderr)
+    sys.exit(1)
+
+target_dir = Path("/etc/mlserver")
+target_dir.mkdir(parents=True, exist_ok=True)
+artifact_file = target_dir / "trusted-runtimes.json"
+artifact_file.write_text(json.dumps(runtimes))
+artifact_file.chmod(0o444)
+target_dir.chmod(0o555)
+EOF
 
 USER 1000
 

@@ -20,6 +20,7 @@ from .build import (
 )
 from .serve import load_settings
 from ..batch_processing import process_batch, CHOICES_TRANSPORT
+from ..settings import ALLOWED_MODEL_IMPLEMENTATIONS, canonicalize_runtime_import_path
 
 
 def click_async(f):
@@ -47,12 +48,26 @@ def _validate_runtime_build_args(
             "--dev cannot be combined with --allow-runtime or --runtime-path"
         )
 
+    # Reject built-in runtimes in --allow-runtime
+    if allow_runtime_import_paths:
+        builtin_runtimes = []
+        for runtime in allow_runtime_import_paths:
+            canonical = canonicalize_runtime_import_path(runtime)
+            if canonical in ALLOWED_MODEL_IMPLEMENTATIONS:
+                builtin_runtimes.append(runtime)
+
+        if builtin_runtimes:
+            builtin_list = ", ".join(f"'{r}'" for r in builtin_runtimes)
+            raise click.UsageError(
+                f"Built-in runtime(s) {builtin_list} cannot be specified with "
+                "--allow-runtime. Built-in runtimes are always allowed by default. "
+                "To use a custom runtime implementation, use a different module name "
+                "(e.g., 'custom_sklearn.MyRuntime')."
+            )
+
     # Require both flags together for custom runtimes
     if allow_runtime_import_paths and not runtime_source_paths:
-        raise click.UsageError(
-            "--allow-runtime requires --runtime-path. "
-            "Built-in runtimes are always allowed by default."
-        )
+        raise click.UsageError("--allow-runtime requires --runtime-path.")
     if runtime_source_paths and not allow_runtime_import_paths:
         raise click.UsageError("--runtime-path requires --allow-runtime.")
 
