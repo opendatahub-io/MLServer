@@ -675,7 +675,10 @@ class ModelSettings(BaseSettings):
 
     @implementation.setter
     def implementation(self, value: Type["MLModel"]):
-        self.implementation_ = _get_import_path(value)
+        import_path = _get_import_path(value)
+        import_path = canonicalize_runtime_import_path(import_path)
+        _assert_trusted_runtime_import_path(import_path)
+        self.implementation_ = import_path
 
     implementation_: str = Field(
         validation_alias=AliasChoices(

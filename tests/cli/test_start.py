@@ -55,7 +55,10 @@ def _stop_mlserver(process: Popen) -> None:
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.wait(timeout=5)
+        try:
+            process.wait(timeout=5)
+        except TimeoutExpired:
+            pass  # Give up; process is unkillable (zombie or kernel issue)
 
 
 @pytest.fixture
@@ -214,3 +217,38 @@ async def test_concurrent_mlserver_start_spawns_workers(
         await asyncio.gather(*[client.close() for _, client in instances])
         for process, _ in instances:
             _stop_mlserver(process)
+
+
+def test_server_startup_aborts_with_corrupted_allowlist(
+    tmp_path: str, settings: Settings, sum_model_settings: ModelSettings, monkeypatch
+):
+    """
+    Test that server.start() aborts when trusted-runtimes.json is corrupted.
+    Verifies that system-level failures (corrupted artifact) cause immediate
+    server shutdown rather than just logging errors.
+    """
+    # Create corrupted trusted-runtimes.json artifact
+    corrupted_artifact = tmp_path / "corrupted-runtimes.json"
+    corrupted_artifact.write_text("{invalid-json", encoding="utf-8")
+
+    # Override artifact path via environment variable
+    monkeypatch.setenv(TEST_TRUSTED_RUNTIMES_ARTIFACT_ENV, str(corrupted_artifact))
+
+    # Create model folder
+    folder = case_sum_model(tmp_path, settings, sum_model_settings)
+
+    # Spawn MLServer (should fail to start)
+    process = _spawn_mlserver(folder)
+
+    try:
+        # Wait for process to exit (should fail fast during server.start())
+        exit_code = process.wait(timeout=10)
+        # Server should exit with non-zero code due to corrupted allowlist
+        assert (
+            exit_code != 0
+        ), "Server should have failed to start with corrupted allowlist"
+    except TimeoutExpired:
+        _stop_mlserver(process)
+        pytest.fail("Server did not exit within timeout - should have failed fast")
+    finally:
+        _stop_mlserver(process)

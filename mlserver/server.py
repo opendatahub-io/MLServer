@@ -116,9 +116,12 @@ class MLServer:
         # a window where endpoints are accessible but security hasn't been verified
         try:
             log_runtime_security_mode()
-        except Exception:
+        except Exception as exc:
             logger.exception("Failed to load trusted runtimes allowlist!")
-            return
+            raise RuntimeError(
+                "Server startup aborted: "
+                "invalid trusted runtimes allowlist configuration"
+            ) from exc
 
         servers = [self._rest_server.start(), self._grpc_server.start()]
         if self._metrics_server:

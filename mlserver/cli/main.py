@@ -72,6 +72,30 @@ def _validate_runtime_build_args(
         raise click.UsageError("--runtime-path requires --allow-runtime.")
 
 
+def _prepare_docker_build_context(
+    folder: str,
+    allow_runtime_import_paths: tuple[str, ...],
+    runtime_source_paths: tuple[str, ...],
+    dev: bool,
+) -> DockerBuildContext:
+    """Validate arguments and prepare Docker build context.
+
+    Raises:
+        click.UsageError: If arguments are invalid or build context creation fails.
+    """
+    _validate_runtime_build_args(dev, allow_runtime_import_paths, runtime_source_paths)
+
+    try:
+        return DockerBuildContext.from_cli_args(
+            folder,
+            allow_runtime_import_paths,
+            runtime_source_paths,
+            dev,
+        )
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+
+
 @click.group()
 @click.version_option()
 def root():
@@ -139,17 +163,9 @@ async def build(
     """
     Build a Docker image for a custom MLServer runtime.
     """
-    _validate_runtime_build_args(dev, allow_runtime_import_paths, runtime_source_paths)
-
-    try:
-        docker_build_context = DockerBuildContext.from_cli_args(
-            folder,
-            allow_runtime_import_paths,
-            runtime_source_paths,
-            dev,
-        )
-    except ValueError as exc:
-        raise click.UsageError(str(exc)) from exc
+    docker_build_context = _prepare_docker_build_context(
+        folder, allow_runtime_import_paths, runtime_source_paths, dev
+    )
     build_image(
         docker_build_context.folder,
         docker_build_context.dockerfile,
@@ -214,17 +230,9 @@ async def dockerfile(
     """
     Generate a Dockerfile
     """
-    _validate_runtime_build_args(dev, allow_runtime_import_paths, runtime_source_paths)
-
-    try:
-        docker_build_context = DockerBuildContext.from_cli_args(
-            folder,
-            allow_runtime_import_paths,
-            runtime_source_paths,
-            dev,
-        )
-    except ValueError as exc:
-        raise click.UsageError(str(exc)) from exc
+    docker_build_context = _prepare_docker_build_context(
+        folder, allow_runtime_import_paths, runtime_source_paths, dev
+    )
     dockerfile_path = write_dockerfile(
         folder,
         docker_build_context.dockerfile,

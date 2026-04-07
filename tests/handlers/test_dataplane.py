@@ -198,9 +198,9 @@ async def test_runtimes_handler_empty_allowlist(empty_allowlist_mode):
     """
     from mlserver.handlers import DataPlane
 
-    # Call runtimes() method directly - it doesn't need the full DataPlane setup
+    # Call runtimes() static method - it doesn't need DataPlane instance
     # since it only reads from settings files
-    response = await DataPlane.runtimes(None)  # type: ignore
+    response = await DataPlane.runtimes()
 
     assert response.mode == "PRODUCTION"
     assert response.allowed_model_implementations == []

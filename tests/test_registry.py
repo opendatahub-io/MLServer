@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import json
 
 from asyncio import CancelledError
 from typing import List, Union
@@ -298,13 +299,18 @@ def test_model_initialiser_wraps_runtime_allowlist_value_error():
         model_initialiser(_InvalidModelSettings())  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize("exc_type", [ImportError, AttributeError, OSError])
+@pytest.mark.parametrize(
+    "exc_type", [ImportError, AttributeError, OSError, ValueError, json.JSONDecodeError]
+)
 def test_model_initialiser_wraps_runtime_import_resolution_errors(exc_type):
     class _InvalidModelSettings:
         name = "bad-model"
 
         @property
         def implementation(self):
+            # JSONDecodeError requires msg, doc, pos arguments
+            if exc_type == json.JSONDecodeError:
+                raise exc_type("failed to resolve runtime import", "", 0)
             raise exc_type("failed to resolve runtime import")
 
     with pytest.raises(RuntimeError, match="Refused to load model 'bad-model'"):

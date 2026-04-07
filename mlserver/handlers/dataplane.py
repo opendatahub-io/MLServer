@@ -79,7 +79,8 @@ class DataPlane:
             extensions=all_extensions,
         )
 
-    async def runtimes(self) -> RuntimeSecurityResponse:
+    @staticmethod
+    async def runtimes() -> RuntimeSecurityResponse:
         from ..settings import (
             _load_image_baked_allowed_model_implementations,
             _get_trusted_runtimes_artifact_path,

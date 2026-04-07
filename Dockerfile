@@ -46,17 +46,15 @@ ARG RUNTIMES
 ARG TRUSTED_RUNTIMES
 ARG PYTHON_VERSION=3.12
 
-# Set a few default environment variables, including `LD_LIBRARY_PATH`
-# (required to use GKE's injected CUDA libraries).
+# Set default environment variables
 # NOTE: When updating between major Python versions, update the PYTHON_VERSION ARG above.
 ENV MLSERVER_MODELS_DIR=/mnt/models \
-    MLSERVER_ENV_TARBALL=/mnt/models/environment.tar.gz \
     MLSERVER_PATH=/opt/mlserver \
     HF_HOME=/opt/mlserver/.cache \
     NUMBA_CACHE_DIR=/opt/mlserver/.cache
 
 # Install some base dependencies required for some libraries.
-# Libomp is needed by the LightGBM runtime.
+# libgomp is needed by the LightGBM runtime.
 RUN microdnf update -y && \
     microdnf install -y \
         libgomp \

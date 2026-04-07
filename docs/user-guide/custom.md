@@ -247,8 +247,9 @@ declare each custom runtime with both `--allow-runtime` and a matching
 `--runtime-path` during image build.
 
 When running `mlserver build`, use an isolated and trusted build workspace.
-Runtime-path validation is performed before Docker consumes the build context,
-so files should not be modified concurrently by other users or processes.
+Runtime-path validation catches misconfigurations early, but does not prevent
+concurrent modifications. Ensure files are not modified during the build by
+enforcing isolation via filesystem permissions or process controls.
 
 For example, if we assume a flat model repository where each folder represents
 a model, you would end up with a folder structure like the one below:
@@ -445,9 +446,9 @@ import path for each runtime through `--allow-runtime` (for example
 ```
 
 ```{note}
-Python modules placed only in the model folder are not auto-imported at serve
-time. Package custom runtime code into the built image and allowlist it through
-`--allow-runtime`.
+In PRODUCTION mode, Python modules placed only in the model folder are not
+auto-imported. Package custom runtime code into the built image and allowlist
+it through `--allow-runtime`.
 
 For each custom runtime module, also pass a matching `--runtime-path` value so
 the source is copied into the image import path (for example,
