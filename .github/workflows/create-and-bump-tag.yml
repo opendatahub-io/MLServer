@@ -37,12 +37,12 @@ jobs:
             echo "Error: tag name and next tag name must be different (both are: $TAG_NAME)"
             exit 1
           fi
-          if [[ ! "$TAG_NAME" =~ ^odh-v[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: tag name format invalid: $TAG_NAME (expected format: odh-vX.Y, e.g., odh-v2.35)"
+          if [[ ! "$TAG_NAME" =~ ^odh-v[0-9]+\.[0-9]+(-EA[0-9]+)?$ ]]; then
+            echo "Error: tag name format invalid: $TAG_NAME (expected format: odh-vX.Y or odh-vX.Y-EAN, e.g., odh-v2.35 or odh-v3.5-EA1)"
             exit 1
           fi
-          if [[ ! "$NEXT_TAG_NAME" =~ ^odh-v[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: next tag name format invalid: $NEXT_TAG_NAME (expected format: odh-vX.Y, e.g., odh-v2.36)"
+          if [[ ! "$NEXT_TAG_NAME" =~ ^odh-v[0-9]+\.[0-9]+(-EA[0-9]+)?$ ]]; then
+            echo "Error: next tag name format invalid: $NEXT_TAG_NAME (expected format: odh-vX.Y or odh-vX.Y-EAN, e.g., odh-v2.36 or odh-v3.6-EA1)"
             exit 1
           fi   
       - name: Checkout code
