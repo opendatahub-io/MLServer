@@ -107,8 +107,8 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "Release Bot"
-          git tag -a $TAG_NAME -m "Release $TAG_NAME"
-          git push origin $TAG_NAME
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
   
   bump-tag: 
     runs-on: ubuntu-latest
@@ -122,7 +122,10 @@ jobs:
         run: |
           echo "Updating mlserver image tag from $TAG_NAME to $NEXT_TAG_NAME in .tekton/mlserver-push.yaml..."
 
-          sed -i "s|mlserver:$TAG_NAME|mlserver:$NEXT_TAG_NAME|g" .tekton/mlserver-push.yaml
+          # Escape special characters for sed
+          TAG_NAME_ESCAPED=$(printf '%s\n' "$TAG_NAME" | sed 's:[][\/.^$*]:\\&:g')
+          NEXT_TAG_NAME_ESCAPED=$(printf '%s\n' "$NEXT_TAG_NAME" | sed 's:[][\/.^$*]:\\&:g')
+          sed -i "s|mlserver:${TAG_NAME_ESCAPED}|mlserver:${NEXT_TAG_NAME_ESCAPED}|g" .tekton/mlserver-push.yaml
 
           echo "Update complete."
       - name: Create Pull Request
