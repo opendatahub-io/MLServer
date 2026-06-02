@@ -187,6 +187,7 @@ def create_app(
         exception_handlers=_EXCEPTION_HANDLERS,  # type: ignore
         docs_url=None,
         redoc_url=None,
+        strict_content_type=False,
     )
 
     if settings.tracing_server:
