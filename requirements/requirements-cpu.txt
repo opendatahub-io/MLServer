@@ -78,9 +78,9 @@ geventhttpclient==2.3.9 \
 googleapis-common-protos==1.75.0 \
     --hash=sha256:371cd0ca347d6b331c0f70fbbf7aa5cbbba6092d91d27c9bbfab7701a1b6612d
 
-greenlet==3.5.2 \
-    --hash=sha256:04c9442657eb4f06280534d63ba1ff974fc559884c3abb6682c92e4b843fa149 \
-    --hash=sha256:1be8d602a6d5379bafa91f3a704cd71b2f966b324ef5e008ed199474a1f413e0
+greenlet==3.5.3 \
+    --hash=sha256:396eb576e8312ea7cc8c7691ea935f499fe440bf1b123936580ea672f7c11d6d \
+    --hash=sha256:e7bf99427ac4174c765563c6c8d5886d672d830237be3f7efab210919efc7cdc
 
 grpcio==1.81.1 \
     --hash=sha256:915b1454a07b3dfa370e1339892841c7aeb51e3237bf46e09901b670008aafea \
