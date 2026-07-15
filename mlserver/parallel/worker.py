@@ -14,6 +14,7 @@ from ..settings import Settings
 from ..metrics import configure_metrics
 from ..context import model_context
 from ..env import Environment
+from ..errors import ModelNotFound
 
 from .messages import (
     ModelRequestMessage,
@@ -161,9 +162,13 @@ class Worker(Process):
             if update.update_type == ModelUpdateType.Load:
                 await self._model_registry.load(model_settings)
             elif update.update_type == ModelUpdateType.Unload:
-                await self._model_registry.unload_version(
-                    model_settings.name, model_settings.version
-                )
+                try:
+                    await self._model_registry.unload_version(
+                        model_settings.name, model_settings.version
+                    )
+                except ModelNotFound:
+                    # Model not present on worker - idempotent operation
+                    pass
             else:
                 logger.warning(
                     "Unknown model update message with type ", update.update_type

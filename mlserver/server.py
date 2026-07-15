@@ -9,7 +9,7 @@ from .logging import configure_logger
 from .registry import MultiModelRegistry
 from .handlers import DataPlane, ModelRepositoryHandlers
 from .parallel import InferencePoolRegistry
-from .batching import load_batching
+from .batching import load_batching, unload_batching, reload_batching
 from .rest import RESTServer
 from .grpc import GRPCServer
 from .metrics import MetricsServer
@@ -58,8 +58,14 @@ class MLServer:
             self.add_custom_handlers,
             load_batching,
         ]
-        on_model_reload = [self.reload_custom_handlers]
-        on_model_unload = [self.remove_custom_handlers]
+        on_model_reload = [
+            self.reload_custom_handlers,
+            reload_batching,
+        ]
+        on_model_unload = [
+            self.remove_custom_handlers,
+            unload_batching,
+        ]
 
         if not self._inference_pool_registry:
             return MultiModelRegistry(
@@ -76,10 +82,12 @@ class MLServer:
         on_model_reload = [
             self._inference_pool_registry.reload_model,  # type: ignore
             self.reload_custom_handlers,
+            reload_batching,
         ]
         on_model_unload = [
             self._inference_pool_registry.unload_model,  # type: ignore
             self.remove_custom_handlers,
+            unload_batching,
         ]
 
         return MultiModelRegistry(
@@ -125,20 +133,30 @@ class MLServer:
 
         servers_task = asyncio.gather(*servers)
 
+        tasks = []
         try:
-            await asyncio.gather(
-                *[
-                    self._model_registry.load(model_settings)
-                    for model_settings in models_settings
-                ]
-            )
+            tasks = [
+                asyncio.create_task(self._model_registry.load(model_settings))
+                for model_settings in models_settings
+            ]
+            await asyncio.gather(*tasks)
             # Mark startup complete only if all models loaded successfully
             self._model_registry.startup_complete()
         except Exception:
             # If one of the models failed to load during startup, shutdown the
             # server gracefully
             logger.exception("Some of the models failed to load during startup!")
+
+            # Explicitly cancel remaining tasks
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+
+            # Wait for cancellations to propagate
+            await asyncio.gather(*tasks, return_exceptions=True)
+
             await self.stop()
+            raise  # Re-raise to signal startup failure to caller
         finally:
             await servers_task
 

@@ -272,6 +272,31 @@ async def test_model_load_error(
     assert models[0].name == "sum-model"
 
 
+async def test_load_error_with_cleanup_failure_preserves_original_error(
+    load_error_model_settings: ModelSettings,
+):
+    """
+    Test when load fails AND cleanup fails, original load error is preserved.
+    """
+
+    async def failing_unload_hook(model: MLModel) -> MLModel:
+        raise RuntimeError("Cleanup hook failed")
+
+    registry = SingleModelRegistry(
+        load_error_model_settings,
+        on_model_unload=[failing_unload_hook],
+    )
+
+    # Load fails, then cleanup also fails
+    # Should raise the ORIGINAL load error, not cleanup error
+    with pytest.raises(MLServerError, match="something really bad happened"):
+        await registry.load(load_error_model_settings)
+
+    # Model should be in registry with ready=False (cleanup failed to remove it)
+    model = await registry.get_model()
+    assert not model.ready
+
+
 async def test_rolling_reload(
     model_registry: MultiModelRegistry, sum_model_settings: ModelSettings
 ):
@@ -324,3 +349,89 @@ def test_model_initialiser_wraps_runtime_import_resolution_errors(exc_type):
 
     with pytest.raises(RuntimeError, match="Refused to load model 'bad-model'"):
         model_initialiser(_InvalidModelSettings())  # type: ignore[arg-type]
+
+
+async def test_unload_hook_failure_keeps_model_in_registry(
+    sum_model_settings: ModelSettings,
+):
+    """Test when unload hook fails, model stays in registry with ready=False"""
+    hook_error = RuntimeError("Hook failed")
+
+    async def failing_unload_hook(model: MLModel) -> MLModel:
+        raise hook_error
+
+    registry = SingleModelRegistry(
+        sum_model_settings,
+        on_model_unload=[failing_unload_hook],
+    )
+
+    # Load model first
+    model = await registry.load(sum_model_settings)
+    assert model.ready
+
+    # Try to unload - should fail
+    with pytest.raises(RuntimeError, match="Hook failed"):
+        await registry.unload()
+
+    # Model should still be in registry but marked not ready
+    registry_model = await registry.get_model()
+    assert registry_model is model
+    assert not model.ready
+
+
+async def test_unload_model_failure_keeps_model_in_registry(
+    unload_error_model_settings: ModelSettings,
+):
+    """Test when unload raises exception, model stays in registry with ready=False"""
+    registry = SingleModelRegistry(unload_error_model_settings)
+
+    # Load model first
+    model = await registry.load(unload_error_model_settings)
+    assert model.ready
+
+    # Try to unload - should fail
+    with pytest.raises(MLServerError, match="something really bad happened"):
+        await registry.unload()
+
+    # Model should still be in registry but marked not ready
+    registry_model = await registry.get_model()
+    assert registry_model is model
+    assert not model.ready
+
+
+async def test_unload_returns_false_keeps_model_in_registry(
+    unload_returns_false_model_settings: ModelSettings,
+):
+    """Test when unload returns False, model stays in registry with ready=False"""
+    registry = SingleModelRegistry(unload_returns_false_model_settings)
+
+    # Load model first
+    model = await registry.load(unload_returns_false_model_settings)
+    assert model.ready
+
+    # Try to unload - should fail with MLServerError
+    with pytest.raises(MLServerError, match="Model unload returned False"):
+        await registry.unload()
+
+    # Model should still be in registry but marked not ready
+    registry_model = await registry.get_model()
+    assert registry_model is model
+    assert not model.ready
+
+
+async def test_unload_success_removes_from_registry(
+    sum_model_settings: ModelSettings,
+):
+    """Test that successful unload removes model from registry"""
+    registry = SingleModelRegistry(sum_model_settings)
+
+    # Load model first
+    model = await registry.load(sum_model_settings)
+    assert model.ready
+
+    # Unload should succeed
+    await registry.unload()
+
+    # Model should be removed from registry
+    with pytest.raises(ModelNotFound):
+        await registry.get_model()

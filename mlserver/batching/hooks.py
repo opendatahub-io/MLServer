@@ -100,3 +100,32 @@ async def load_batching(model: MLModel) -> MLModel:
     setattr(model, "predict", adaptive_batching(model.predict))
     setattr(model, "predict_stream", not_implemented_warning(model.predict_stream))
     return model
+
+
+async def unload_batching(model: MLModel) -> MLModel:
+    """Clean up batching resources when unloading a model."""
+    from ..parallel.utils import cancel_task
+
+    batcher = getattr(model, _AdaptiveBatchingAttr, None)
+    if not batcher:
+        return model
+
+    # Cancel the background batching task
+    if batcher._batching_task and not batcher._batching_task.done():
+        await cancel_task(batcher._batching_task)
+
+    # Remove batcher from model to break reference cycle
+    delattr(model, _AdaptiveBatchingAttr)
+
+    return model
+
+
+async def reload_batching(old_model: MLModel, new_model: MLModel) -> MLModel:
+    """Set up new model batching and clean up old model batching during reload."""
+    # Set up batching for new model first
+    new_model = await load_batching(new_model)
+
+    # Clean up old model's batching resources only after new one succeeds
+    await unload_batching(old_model)
+
+    return new_model

@@ -7,7 +7,7 @@ from functools import cmp_to_key
 
 from .context import model_context
 from .model import MLModel
-from .errors import ModelNotFound
+from .errors import MLServerError, ModelNotFound
 from .logging import logger
 from .settings import ModelSettings
 
@@ -182,7 +182,13 @@ class SingleModelRegistry:
                 f"Couldn't load model '{model.name}'. "
                 "Model will be removed from registry."
             )
-            await self._unload_model(model)
+            try:
+                await self._unload_model(model)
+            except Exception as cleanup_error:
+                logger.error(
+                    f"Failed to cleanup model '{model.name}' after load failure",
+                    exc_info=cleanup_error,
+                )
             raise
 
     async def _reload_model(self, old_model: MLModel, new_model: MLModel):
@@ -216,24 +222,35 @@ class SingleModelRegistry:
 
     async def _unload_model(self, model: MLModel):
         with model_context(model.settings):
-            # NOTE: Every callback needs to run to ensure one doesn't block the
-            # others
-            await asyncio.gather(
-                *[callback(model) for callback in self._on_model_unload],
-                return_exceptions=True,
-            )
-
-            if model.version:
-                del self._versions[model.version]
-
-            if model == self.default:
-                self._clear_default()
-
-            model.ready = not await model.unload()
-
             model_msg = f"model '{model.name}'"
             if model.version:
                 model_msg = f"version {model.version} of {model_msg}"
+
+            # Run hooks - if any fail, abort unload
+            # NOTE: Callbacks need to be executed sequentially to ensure that
+            # they go in the right order
+            try:
+                for callback in self._on_model_unload:
+                    await callback(model)
+            except Exception as e:
+                logger.error(f"Unload hook failed for {model_msg}: {e}", exc_info=e)
+                model.ready = False
+                raise
+
+            # Unload the model
+            try:
+                if not await model.unload():
+                    raise MLServerError(f"Model unload returned False for {model_msg}")
+            finally:
+                model.ready = False
+
+            # Only remove from registry after unload succeeds
+            # Idempotent removal (safe under concurrent unloads)
+            if model.version:
+                self._versions.pop(model.version, None)
+
+            if model == self.default:
+                self._clear_default()
 
             logger.info(f"Unloaded {model_msg} successfully.")
 

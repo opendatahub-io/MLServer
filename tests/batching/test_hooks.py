@@ -2,7 +2,12 @@ import pytest
 
 from mlserver.model import MLModel
 from mlserver.types import InferenceRequest, InferenceResponse
-from mlserver.batching.hooks import load_batching
+from mlserver.batching.hooks import (
+    load_batching,
+    unload_batching,
+    reload_batching,
+    _AdaptiveBatchingAttr,
+)
 
 
 async def test_batching_predict(
@@ -57,3 +62,63 @@ async def test_load_batching_disabled(
     await load_batching(sum_model)
 
     assert expected == sum_model.predict  # type: ignore
+
+
+async def test_unload_batching_removes_batcher(sum_model: MLModel):
+    """Test that unload_batching removes the batcher attribute"""
+    # Enable and load batching
+    sum_model.settings.max_batch_size = 10
+    sum_model.settings.max_batch_time = 0.4
+    await load_batching(sum_model)
+
+    # Batcher should exist
+    assert hasattr(sum_model, _AdaptiveBatchingAttr)
+
+    # Unload batching
+    await unload_batching(sum_model)
+
+    # Batcher should be removed
+    assert not hasattr(sum_model, _AdaptiveBatchingAttr)
+
+
+async def test_unload_batching_idempotent(sum_model: MLModel):
+    """Test that unload_batching is safe to call on model without batching"""
+    # Don't load batching
+    assert not hasattr(sum_model, _AdaptiveBatchingAttr)
+
+    # Should not raise
+    result = await unload_batching(sum_model)
+    assert result is sum_model
+
+
+async def test_reload_batching_cleans_up_old_and_sets_up_new(
+    sum_model: MLModel, simple_model: MLModel
+):
+    """Test that reload_batching cleans up old model and sets up new model"""
+    # Enable batching on old model
+    sum_model.settings.max_batch_size = 10
+    sum_model.settings.max_batch_time = 0.4
+
+    # Load batching on old model
+    await load_batching(sum_model)
+
+    old_batcher = getattr(sum_model, _AdaptiveBatchingAttr)
+    assert old_batcher is not None
+
+    # Enable batching on new model
+    simple_model.settings.max_batch_size = 10
+    simple_model.settings.max_batch_time = 0.1
+
+    # Reload batching
+    result = await reload_batching(sum_model, simple_model)
+
+    # Old model batcher should be removed
+    assert not hasattr(sum_model, _AdaptiveBatchingAttr)
+
+    # New model should have batching loaded
+    assert hasattr(simple_model, _AdaptiveBatchingAttr)
+    new_batcher = getattr(simple_model, _AdaptiveBatchingAttr)
+    assert new_batcher is not old_batcher
+
+    # Should return new model
+    assert result is simple_model

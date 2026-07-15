@@ -199,6 +199,28 @@ def load_error_model_settings() -> ModelSettings:
 
 
 @pytest.fixture
+def unload_error_model_settings() -> ModelSettings:
+    from .fixtures import ErrorModel
+
+    return ModelSettings(
+        name="error-model",
+        implementation=ErrorModel,
+        parameters=ModelParameters(unload_error=True),
+    )
+
+
+@pytest.fixture
+def unload_returns_false_model_settings() -> ModelSettings:
+    from .fixtures import ErrorModel
+
+    return ModelSettings(
+        name="error-model",
+        implementation=ErrorModel,
+        parameters=ModelParameters(unload_returns_false=True),
+    )
+
+
+@pytest.fixture
 def simple_model_settings() -> ModelSettings:
     model_settings_path = os.path.join(TESTDATA_PATH, DEFAULT_MODEL_SETTINGS_FILENAME)
     model_settings = ModelSettings.parse_file(model_settings_path)
