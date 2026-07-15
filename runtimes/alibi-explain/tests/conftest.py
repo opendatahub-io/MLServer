@@ -120,7 +120,6 @@ async def model_registry(
 ) -> AsyncIterable[MultiModelRegistry]:
     model_registry = MultiModelRegistry(
         on_model_load=[inference_pool_registry.load_model],
-        on_model_reload=[inference_pool_registry.reload_model],
         on_model_unload=[inference_pool_registry.unload_model],
         model_initialiser=inference_pool_registry.model_initialiser,
     )

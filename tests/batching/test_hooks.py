@@ -2,7 +2,8 @@ import pytest
 
 from mlserver.model import MLModel
 from mlserver.types import InferenceRequest, InferenceResponse
-from mlserver.batching.hooks import load_batching
+from mlserver.batching.hooks import load_batching, unload_batching
+from mlserver.batching.adaptive import AdaptiveBatcher
 
 
 async def test_batching_predict(
@@ -57,3 +58,50 @@ async def test_load_batching_disabled(
     await load_batching(sum_model)
 
     assert expected == sum_model.predict  # type: ignore
+
+
+async def test_unload_batching_removes_batcher(sum_model: MLModel):
+    """Test that unload_batching removes the batcher attribute"""
+    # Enable and load batching
+    sum_model.settings.max_batch_size = 10
+    sum_model.settings.max_batch_time = 0.4
+    await load_batching(sum_model)
+
+    # Batcher should exist
+    assert AdaptiveBatcher.get_batcher(sum_model) is not None
+
+    # Unload batching
+    await unload_batching(sum_model)
+
+    # Batcher should be removed
+    assert AdaptiveBatcher.get_batcher(sum_model) is None
+
+
+async def test_unload_batching_idempotent(sum_model: MLModel):
+    """Test that unload_batching is safe to call on model without batching"""
+    # Don't load batching
+    assert AdaptiveBatcher.get_batcher(sum_model) is None
+
+    # Should not raise
+    result = await unload_batching(sum_model)
+    assert result is sum_model
+
+
+async def test_unload_batching_restores_predict_and_predict_stream_methods(
+    sum_model: MLModel,
+):
+    """Test that unload_batching restores original predict and predict_stream methods"""
+    sum_model.settings.max_batch_size = 10
+    sum_model.settings.max_batch_time = 0.4
+
+    original_predict = sum_model.predict
+    original_predict_stream = sum_model.predict_stream
+
+    await load_batching(sum_model)
+    assert AdaptiveBatcher.get_batcher(sum_model) is not None
+
+    await unload_batching(sum_model)
+
+    assert sum_model.predict == original_predict
+    assert sum_model.predict_stream == original_predict_stream
+    assert AdaptiveBatcher.get_batcher(sum_model) is None
