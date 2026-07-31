@@ -185,8 +185,8 @@ pandas==3.0.3 \
     --hash=sha256:8e459d7d06df1364b9b6d42d433cf5cb4687a890be579c6864491ff01cce6340 \
     --hash=sha256:df6a10fabaf2fcb277d4ae265a0d4ab9b9a4c3776317713419fae5728b3e8cd0
 
-prometheus-client==0.25.0 \
-    --hash=sha256:34577aeee817238adf900bebb60c63697fa70d15d8f9e1c6984729cce45fb10f
+prometheus-client==0.26.0 \
+    --hash=sha256:347c1aa82def23527399fe7d4c54f0f9ead3026169d3377173ddebcb5f597756
 
 propcache==0.5.2 \
     --hash=sha256:54bc48bc3831e3961366b03767df820e5e2b94a4713cbf1df90227964217e66d \
