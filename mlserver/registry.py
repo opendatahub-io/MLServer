@@ -17,6 +17,7 @@ ModelReloadHook = Callable[[MLModel, MLModel], Awaitable[MLModel]]
 
 
 def _get_version(model_settings: ModelSettings) -> str | None:
+    """Extract the version string from *model_settings*, if present."""
     if model_settings.parameters:
         return model_settings.parameters.version
 
@@ -50,6 +51,12 @@ def _is_newer(a: MLModel, b: MLModel) -> int:
 
 
 def model_initialiser(model_settings: ModelSettings) -> MLModel:
+    """Default factory that resolves the ``implementation`` import path and
+    instantiates the corresponding :class:`MLModel` subclass.
+
+    Raises :class:`RuntimeError` if the import path cannot be resolved (bad
+    path, missing package, invalid JSON in settings, etc.).
+    """
     try:
         model_class = model_settings.implementation
     except (
@@ -107,6 +114,9 @@ class SingleModelRegistry:
         self._default = None
 
     def _refresh_default(self, new_model: MLModel | None = None) -> MLModel | None:
+        """Update the default (latest) model pointer.  When *new_model* is
+        provided, a fast comparison avoids iterating all versions.  Otherwise
+        the full version set is scanned via :meth:`_find_default`."""
         if new_model:
             # Check whether new model is "defaulter" than current default
             # NOTE: This should help to avoid iterating through all versioned
@@ -146,6 +156,13 @@ class SingleModelRegistry:
         return self._default
 
     async def load(self, model_settings: ModelSettings) -> MLModel:
+        """Load (or reload) a model from *model_settings*.
+
+        If a model with the same version is already loaded, it is reloaded
+        using a rolling-deployment pattern: the new model is loaded and
+        registered before the old one is unloaded, ensuring at least one
+        version is always available.
+        """
         # If there's a previously loaded model, we'll need to unload it at the
         # end
         previous_version = _get_version(model_settings)
@@ -162,6 +179,11 @@ class SingleModelRegistry:
         return new_model
 
     async def _load_model(self, model: MLModel):
+        """Execute the full load sequence: register → run hooks → load artifact.
+
+        On failure the model is unloaded and removed from the registry so it
+        does not remain in a half-loaded state.
+        """
         try:
             # Register the model before loading it, to ensure that the model
             # appears as a not-ready (i.e. loading) model
@@ -186,6 +208,10 @@ class SingleModelRegistry:
             raise
 
     async def _reload_model(self, old_model: MLModel, new_model: MLModel):
+        """Reload by loading *new_model* before unloading *old_model*,
+        mimicking a rolling deployment so that at least one version is always
+        available to serve traffic.
+        """
         for callback in self._on_model_reload:
             new_model = await callback(old_model, new_model)
 
@@ -215,6 +241,10 @@ class SingleModelRegistry:
         await self._unload_model(model)
 
     async def _unload_model(self, model: MLModel):
+        """Unload a single model version: run all unload hooks in parallel,
+        remove from the versions dict, clear the default if needed, then call
+        ``model.unload()``.
+        """
         with model_context(model.settings):
             # NOTE: Every callback needs to run to ensure one doesn't block the
             # others
@@ -319,6 +349,8 @@ class MultiModelRegistry:
         self._startup_complete = True
 
     async def load(self, model_settings: ModelSettings) -> MLModel:
+        """Load a model, creating a new :class:`SingleModelRegistry` for its
+        name if this is the first version."""
         if model_settings.name not in self._models:
             self._models[model_settings.name] = SingleModelRegistry(
                 model_settings,
@@ -331,11 +363,15 @@ class MultiModelRegistry:
         return await self._models[model_settings.name].load(model_settings)
 
     async def unload(self, name: str):
+        """Unload all versions of model *name* and remove it from the
+        registry."""
         model_registry = self._get_model_registry(name)
         await model_registry.unload()
         del self._models[name]
 
     async def unload_version(self, name: str, version: str | None = None):
+        """Unload a single version of model *name*.  If no versions remain,
+        the model entry is removed from the registry entirely."""
         model_registry = self._get_model_registry(name, version)
         await model_registry.unload_version(version)
         if model_registry.empty():

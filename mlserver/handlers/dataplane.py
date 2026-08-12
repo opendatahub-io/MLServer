@@ -31,6 +31,8 @@ class DataPlane:
     """
 
     def __init__(self, settings: Settings, model_registry: MultiModelRegistry):
+        """Initialise the DataPlane with Prometheus counters, response cache
+        (when enabled), and the CloudEvents inference middleware."""
         self._settings = settings
         self._model_registry = model_registry
         self._response_cache = None
@@ -61,6 +63,9 @@ class DataPlane:
         return True
 
     async def ready(self) -> bool:
+        """Check server readiness.  Returns ``False`` during startup, then
+        applies the ``strict_readiness`` / ``empty_registry_readiness`` settings
+        to decide based on loaded model states."""
         # Return false if startup has not completed
         if not self._model_registry.is_startup_complete:
             return False
@@ -133,6 +138,9 @@ class DataPlane:
         name: str,
         version: str | None = None,
     ) -> InferenceResponse:
+        """Run inference on the named model.  Handles request middleware,
+        response caching (when enabled), Prometheus metrics, and response
+        middleware in a single context-managed flow."""
         # need to cache the payload here since it
         # will be modified in the context manager
         if self._response_cache is not None:
@@ -168,6 +176,9 @@ class DataPlane:
         name: str,
         version: str | None = None,
     ) -> AsyncIterator[InferenceResponse]:
+        """Streaming inference: yields ``InferenceResponse`` objects as the
+        model generates them.  All responses share the ID of the first
+        request payload."""
         # TODO: Implement cache for stream
 
         async with self._infer_contextmanager(name, version) as model:
@@ -221,6 +232,8 @@ class DataPlane:
         name: str,
         version: str | None = None,
     ) -> AsyncIterator[MLModel]:
+        """Context manager that wraps inference with Prometheus duration/error
+        tracking, model readiness checks, and ``model_context`` activation."""
 
         infer_duration = self._ModelInferRequestDuration.labels(
             model=name, version=version

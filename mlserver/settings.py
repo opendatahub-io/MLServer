@@ -54,6 +54,9 @@ logger = logging.getLogger(__name__)
 
 
 def is_valid_runtime_import_path(value: object) -> bool:
+    """Check that *value* is a dotted Python import path with an uppercase
+    class name as the final segment.  Used to validate runtime declarations
+    in both settings parsing and the trusted runtimes allowlist."""
     if not isinstance(value, str) or not RUNTIME_IMPORT_PATH_PATTERN.fullmatch(value):
         return False
     _, _, attr = value.rpartition(".")
@@ -95,6 +98,10 @@ _BUILTIN_RUNTIME_IMPORT_PATH_ALIASES = {
 
 
 def canonicalize_runtime_import_path(import_path: str) -> str:
+    """Map verbose built-in runtime paths (e.g.
+    ``mlserver_sklearn.sklearn.SKLearnModel``) to their canonical short form
+    (``mlserver_sklearn.SKLearnModel``).  Unknown paths pass through unchanged.
+    """
     return _BUILTIN_RUNTIME_IMPORT_PATH_ALIASES.get(import_path, import_path)
 
 
@@ -138,6 +145,9 @@ def clear_trusted_runtime_caches() -> None:
 
 
 def _assert_trusted_runtime_import_path(import_path: str) -> None:
+    """Validate *import_path* against format rules and, in PRODUCTION mode,
+    the trusted runtimes allowlist.  Raises :class:`ValueError` on rejection.
+    """
     if not is_valid_runtime_import_path(import_path):
         raise ValueError("Model implementation has an invalid import path.")
 

@@ -98,6 +98,9 @@ class Endpoints:
         model_name: str,
         model_version: str | None = None,
     ) -> InferenceResponse:
+        """Handle ``POST /v2/models/{name}/infer``: extract HTTP headers into
+        the payload, delegate to :meth:`DataPlane.infer`, and propagate any
+        response headers back to the HTTP response."""
 
         request_headers = dict(raw_request.headers)
         insert_headers(payload, request_headers)
@@ -119,6 +122,9 @@ class Endpoints:
         model_name: str,
         model_version: str | None = None,
     ) -> StreamingResponse:
+        """Handle streaming inference via Server-Sent Events (SSE).  Wraps the
+        payload in a single-element async generator and converts the response
+        stream into SSE frames."""
 
         request_headers = dict(raw_request.headers)
         insert_headers(payload, request_headers)
