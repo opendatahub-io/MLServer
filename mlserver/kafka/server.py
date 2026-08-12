@@ -17,11 +17,19 @@ from ..utils import schedule_with_callback
 
 # TODO: Explore implementing custom handler
 class KafkaMethodTypes(Enum):
+    """Supported Kafka request method types (currently inference only)."""
+
     infer = "infer"
 
 
 class KafkaServer:
+    """Inference server that consumes requests from a Kafka input topic,
+    dispatches them to the DataPlane, and publishes responses to an output
+    topic."""
+
     def __init__(self, settings: Settings, data_plane: DataPlane):
+        """Configure the Kafka server with connection settings and bind to the
+        data plane for request handling."""
         self._settings = settings
         self._handlers = KafkaHandlers(data_plane)
 
@@ -35,14 +43,18 @@ class KafkaServer:
         )
 
     async def add_custom_handlers(self, model: MLModel):
+        """Register custom Kafka handlers for a model (not yet implemented)."""
         # TODO: Implement
         pass
 
     async def delete_custom_handlers(self, model: MLModel):
+        """Remove custom Kafka handlers for a model (not yet implemented)."""
         # TODO: Implement
         pass
 
     async def start(self):
+        """Create the Kafka consumer and producer, then enter the consumer
+        loop until the consumer is stopped."""
         self._create_server()
 
         await self._consumer.start()
@@ -99,6 +111,7 @@ class KafkaServer:
         logger.info(f"Processed message of type '{request_method}'")
 
     async def stop(self, sig: int | None = None):
+        """Stop the Kafka consumer and producer gracefully."""
         logger.info("Waiting for Kafka server shutdown")
         await self._consumer.stop()
         await self._producer.stop()

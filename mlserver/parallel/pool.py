@@ -46,25 +46,30 @@ class WorkerRegistry:
     """
 
     def __init__(self) -> None:
+        """Initialise an empty worker-side model registry."""
         self._models: dict[str, ModelSettings] = {}
 
     def _key(self, model_settings: ModelSettings) -> str:
         return f"{model_settings.name}-{model_settings.version}"
 
     def add(self, model_settings: ModelSettings):
+        """Register a model so it can be reloaded on worker restart."""
         model_key = self._key(model_settings)
         self._models[model_key] = model_settings
 
     def remove(self, model_settings: ModelSettings):
+        """Remove a model from the registry if present."""
         model_key = self._key(model_settings)
         if model_key in self._models:
             del self._models[model_key]
 
     def __len__(self) -> int:
+        """Return the number of tracked models."""
         return len(self._models)
 
     @property
     def models(self) -> Iterable[ModelSettings]:
+        """Iterate over all registered model settings."""
         return self._models.values()
 
 
@@ -85,6 +90,11 @@ class InferencePool:
         env: Environment | None = None,
         on_worker_stop: list[InferencePoolHook] = [],
     ):
+        """Create a pool of inference workers.
+
+        Spawns ``settings.parallel_workers`` processes, optionally inside a
+        custom Python *env*, and starts the response dispatcher.
+        """
         configure_inference_pool(settings)
 
         self._on_worker_stop = on_worker_stop
@@ -102,6 +112,7 @@ class InferencePool:
 
     @property
     def env_hash(self) -> str | None:
+        """Return the hash of the custom environment, or ``None`` for the default pool."""
         if not self._env:
             return None
 
@@ -109,6 +120,7 @@ class InferencePool:
 
     @property
     def name(self) -> str:
+        """Return a human-readable label for this inference pool."""
         if self.env_hash:
             return f"inference pool with hash '{self.env_hash}'"
 
@@ -181,6 +193,7 @@ class InferencePool:
         return ParallelModel(model, self._dispatcher)
 
     async def reload_model(self, old_model: MLModel, new_model: MLModel) -> MLModel:
+        """Replace a loaded model with a new version across all workers."""
         # The model registries within each worker will take care of reloading
         # the model internally
         self._worker_registry.remove(old_model.settings)
@@ -188,6 +201,7 @@ class InferencePool:
         return await self.load_model(new_model)
 
     async def unload_model(self, model: MLModel) -> MLModel:
+        """Broadcast an unload message for a model to all workers."""
         unload_message = ModelUpdateMessage(
             update_type=ModelUpdateType.Unload,
             model_settings=model.settings,  # type: ignore
@@ -198,6 +212,7 @@ class InferencePool:
         return ParallelModel(model, self._dispatcher)
 
     def empty(self) -> bool:
+        """Return ``True`` if no models are loaded in the pool."""
         return len(self._worker_registry) == 0
 
     async def close(self):

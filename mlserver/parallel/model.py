@@ -13,12 +13,18 @@ from .dispatcher import Dispatcher
 
 
 class ModelMethods(Enum):
+    """Standard model method names dispatched to workers."""
+
     Predict = "predict"
     Metadata = "metadata"
 
 
 class ParallelModel(MLModel):
+    """Proxy that delegates ``predict()`` and custom handler calls to remote
+    workers via the dispatcher, while caching metadata locally."""
+
     def __init__(self, model: MLModel, dispatcher: Dispatcher):
+        """Wrap an existing model so its methods execute in worker processes."""
         super().__init__(model.settings)
         self._model = model
         self._dispatcher = dispatcher
@@ -40,6 +46,7 @@ class ParallelModel(MLModel):
         return _inner
 
     async def metadata(self) -> MetadataModelResponse:
+        """Return model metadata, caching the result after the first call."""
         # NOTE: We cache metadata to avoid expensive worker calls for static
         # data
         if self._metadata is None:
@@ -52,6 +59,7 @@ class ParallelModel(MLModel):
         return self._metadata
 
     async def predict(self, payload: InferenceRequest) -> InferenceResponse:
+        """Dispatch an inference request to a worker and return the response."""
         inference_response = await self._send(ModelMethods.Predict.value, payload)
         if not isinstance(inference_response, InferenceResponse):
             raise InferenceError(

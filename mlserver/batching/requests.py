@@ -13,10 +13,12 @@ from .shape import Shape
 
 
 def _get_data(payload: RequestInput | ResponseOutput):
+    """Extract raw data from a request input or response output."""
     return getattr(payload.data, "root", payload.data)
 
 
 def _get_parameters(payload: ResponseOutput) -> defaultdict[Any, Any]:
+    """Extract parameters from a response output into a defaultdict."""
     parameters = defaultdict(list)
     if payload.parameters is not None:
         payload_parameters = payload.parameters.model_dump()
@@ -38,6 +40,7 @@ def _merge_parameters(
         InferenceRequest | InferenceResponse | RequestInput | RequestOutput
     ),
 ) -> dict:
+    """Merge parameters from a parametrised object into an accumulator dict."""
     if not parametrised_obj.parameters:
         return all_params
 
@@ -51,6 +54,7 @@ def _merge_input_parameters(
         InferenceRequest | InferenceResponse | RequestInput | RequestOutput
     ),
 ) -> dict:
+    """Merge input parameters, accumulating values for shared keys into lists."""
     if not parametrised_obj.parameters:
         return all_params
     obj_params = parametrised_obj.parameters.model_dump()
@@ -80,6 +84,7 @@ def _merge_input_parameters(
 
 
 def _merge_data(all_data: list | list[str] | list[bytes]) -> list | str | bytes:
+    """Concatenate data segments from multiple inputs into a single payload."""
     sampled_datum = all_data[0]
 
     if isinstance(sampled_datum, str):
@@ -96,7 +101,11 @@ def _merge_data(all_data: list | list[str] | list[bytes]) -> list | str | bytes:
 
 
 class BatchedRequests:
+    """Merges multiple inference requests into a single batched request and
+    splits the batched response back into per-request responses."""
+
     def __init__(self, inference_requests: dict[str, InferenceRequest] = {}):
+        """Initialise from a dict mapping internal IDs to inference requests."""
         self.inference_requests = inference_requests
 
         # External IDs represent the incoming prediction IDs that need to match
@@ -113,6 +122,7 @@ class BatchedRequests:
         self.merged_request = self._merge_requests()
 
     def _merge_requests(self) -> InferenceRequest:
+        """Combine all stored inference requests into a single batched request."""
         inputs_index: dict[str, dict[str, RequestInput]] = defaultdict(OrderedDict)
         outputs_index: dict[str, dict[str, RequestOutput]] = defaultdict(OrderedDict)
         all_params: dict = {}
@@ -150,6 +160,7 @@ class BatchedRequests:
     def _merge_request_inputs(
         self, request_inputs: dict[str, RequestInput]
     ) -> RequestInput:
+        """Merge same-named inputs across requests into a single RequestInput."""
         # Note that minibatch sizes could be different on each input head,
         # however, to simplify the implementation, here we assume that it will
         # be the same across all of them
@@ -182,6 +193,7 @@ class BatchedRequests:
     def _merge_request_outputs(
         self, request_outputs: dict[str, RequestOutput]
     ) -> RequestOutput:
+        """Merge same-named outputs across requests into a single RequestOutput."""
         all_params: dict = {}
         for internal_id, request_output in request_outputs.items():
             all_params = _merge_parameters(all_params, request_output)
@@ -196,6 +208,8 @@ class BatchedRequests:
     def split_response(
         self, batched_response: InferenceResponse
     ) -> dict[str, InferenceResponse]:
+        """Split a batched response back into individual responses keyed by
+        internal request ID, restoring original batch sizes and IDs."""
         responses: dict[str, InferenceResponse] = {}
 
         for response_output in batched_response.outputs:
@@ -218,6 +232,7 @@ class BatchedRequests:
     def _split_response_output(
         self, response_output: ResponseOutput
     ) -> dict[str, ResponseOutput]:
+        """Split a single batched ResponseOutput into per-request outputs."""
         all_data = self._split_data(response_output)
         if response_output.parameters is not None:
             all_parameters = self._split_parameters(response_output)
@@ -242,6 +257,7 @@ class BatchedRequests:
         return response_outputs
 
     def _split_data(self, response_output: ResponseOutput) -> dict[str, Any]:
+        """Split merged data back into per-request slices using minibatch sizes."""
         merged_shape = Shape(response_output.shape)
         element_size = merged_shape.elem_size
         merged_data = _get_data(response_output)
@@ -259,6 +275,7 @@ class BatchedRequests:
     def _split_parameters(
         self, response_output: ResponseOutput
     ) -> dict[str, Parameters]:
+        """Split merged parameters back into per-request Parameters objects."""
         merged_parameters = _get_parameters(response_output)
         idx = 0
 

@@ -20,17 +20,21 @@ DefaultGrpcWorkers = 5
 
 
 class GRPCServer:
+    """Async gRPC server exposing the KServe V2 inference and model repository APIs."""
+
     def __init__(
         self,
         settings: Settings,
         data_plane: DataPlane,
         model_repository_handlers: ModelRepositoryHandlers,
     ):
+        """Initialise with server *settings*, a *data_plane*, and *model_repository_handlers*."""
         self._settings = settings
         self._data_plane = data_plane
         self._model_repository_handlers = model_repository_handlers
 
     def _create_server(self):
+        """Build and configure the gRPC server with servicers and interceptors."""
         self._inference_servicer = InferenceServicer(
             self._data_plane, self._model_repository_handlers
         )
@@ -92,6 +96,7 @@ class GRPCServer:
         return self._server
 
     def _get_options(self) -> list[tuple[str, Any]]:
+        """Build gRPC channel options from settings (message size, custom opts)."""
         options_dict = {}
 
         if self._settings._custom_grpc_server_settings:
@@ -113,6 +118,7 @@ class GRPCServer:
         return list(options_dict.items())
 
     async def start(self):
+        """Create and start the gRPC server, blocking until termination."""
         self._create_server()
 
         await self._server.start()
@@ -124,6 +130,7 @@ class GRPCServer:
         await self._server.wait_for_termination()
 
     async def stop(self, sig: int | None = None):
+        """Gracefully stop the gRPC server."""
         logger.info("Waiting for gRPC server shutdown")
         # TODO: Read from config
         await self._server.stop(grace=5)

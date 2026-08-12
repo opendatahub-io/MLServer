@@ -10,11 +10,15 @@ from ..settings import ModelSettings
 
 
 class ModelUpdateType(IntEnum):
+    """Type of model lifecycle update dispatched to workers."""
+
     Load = 1
     Unload = 2
 
 
 class Message(BaseModel):
+    """Base message exchanged between the main process and inference workers."""
+
     model_config = ConfigDict(
         protected_namespaces=(),
     )
@@ -23,6 +27,8 @@ class Message(BaseModel):
 
 
 class ModelRequestMessage(Message):
+    """Request sent to a worker to invoke a model method (e.g. predict)."""
+
     model_name: str
     model_version: str | None = None
     method_name: str
@@ -31,6 +37,8 @@ class ModelRequestMessage(Message):
 
 
 class ModelResponseMessage(Message):
+    """Response from a worker carrying a return value or an exception."""
+
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
     )
@@ -40,10 +48,17 @@ class ModelResponseMessage(Message):
 
 
 class ModelUpdateMessage(Message):
+    """Instructs workers to load or unload a model.
+
+    Accepts a ``model_settings`` kwarg at init which is serialised to JSON
+    for safe cross-process transfer.
+    """
+
     update_type: ModelUpdateType
     serialised_model_settings: str
 
     def __init__(self, *args, **kwargs):
+        """Serialise *model_settings* to JSON for cross-process transfer."""
         model_settings = kwargs.pop("model_settings", None)
         if model_settings:
             as_dict = model_settings.model_dump(by_alias=True)
@@ -57,4 +72,5 @@ class ModelUpdateMessage(Message):
 
     @property
     def model_settings(self) -> ModelSettings:
+        """Deserialise and return the model settings from JSON."""
         return ModelSettings.parse_raw(self.serialised_model_settings)

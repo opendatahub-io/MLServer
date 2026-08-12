@@ -31,6 +31,7 @@ class APIRoute(FastAPIRoute):
         response_class=Response,
         **kwargs
     ):
+        """Set defaults to exclude unset and ``None`` fields in responses."""
         super().__init__(
             *args,
             response_model_exclude_unset=response_model_exclude_unset,
@@ -40,6 +41,8 @@ class APIRoute(FastAPIRoute):
         )
 
     def get_route_handler(self) -> Callable:
+        """Return a handler that wraps incoming requests in our custom
+        :class:`Request` class."""
         original_route_handler = super().get_route_handler()
 
         async def custom_route_handler(request: Request) -> FastAPIResponse:
@@ -54,6 +57,8 @@ def create_app(
     data_plane: DataPlane,
     model_repository_handlers: ModelRepositoryHandlers,
 ) -> FastAPI:
+    """Build the FastAPI application with all v2 dataplane and model
+    repository routes, middleware, and metrics."""
     endpoints = Endpoints(data_plane)
     model_repository_endpoints = ModelRepositoryEndpoints(model_repository_handlers)
 

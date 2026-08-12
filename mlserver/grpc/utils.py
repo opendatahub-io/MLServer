@@ -18,6 +18,7 @@ STATUS_CODE_MAPPING = {
 
 
 def to_headers(context: ServicerContext) -> dict[str, str]:
+    """Convert gRPC invocation and trailing metadata into a headers dict."""
     metadata = context.invocation_metadata()
     if hasattr(context, "trailing_metadata"):
         # NOTE: Older versions of `grpcio` (e.g. `grpcio==1.34.0`) don't expose
@@ -31,14 +32,17 @@ def to_headers(context: ServicerContext) -> dict[str, str]:
 
 
 def to_metadata(headers: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    """Convert a headers dict into gRPC metadata tuples (keys lowercased)."""
     return tuple((key.lower(), value) for key, value in headers.items())
 
 
 def _grpc_status_code(err: MLServerError):
+    """Map an MLServerError's HTTP status code to a gRPC StatusCode."""
     return STATUS_CODE_MAPPING.get(err.status_code, grpc.StatusCode.UNKNOWN)
 
 
 def handle_mlserver_error(f: Callable):
+    """Decorator that catches MLServerError and aborts with the mapped gRPC status."""
     async def _inner(self, request, context):
         try:
             return await f(self, request, context)
@@ -53,6 +57,7 @@ def handle_mlserver_error(f: Callable):
 
 
 def handle_mlserver_stream_error(f: Callable):
+    """Decorator that catches errors in streaming RPCs and aborts with gRPC status."""
     async def _inner(self, request_stream, context):
         try:
             async for response in f(self, request_stream, context):

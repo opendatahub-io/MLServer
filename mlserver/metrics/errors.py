@@ -4,6 +4,8 @@ from ..errors import MLServerError
 
 
 class InvalidModelContext(MLServerError):
+    """Raised when a contextual method is called outside a model context."""
+
     def __init__(self):
         msg = (
             "Contextual method (e.g. mlserver.log() or mlserver.register())"
@@ -13,7 +15,10 @@ class InvalidModelContext(MLServerError):
 
 
 class MetricNotFound(MLServerError):
+    """Raised when a metric name is not registered or has an unexpected type."""
+
     def __init__(self, metric_name: str, collector=None):
+        """Initialise with the metric name and optional mismatched collector."""
         msg = f"No metric found with name '{metric_name}'"
         if collector:
             msg = (

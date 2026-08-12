@@ -16,11 +16,15 @@ class Response(_JSONResponse):
     media_type = "application/json"
 
     def render(self, content: Any) -> bytes:
+        """Render *content* to JSON bytes using the fastest available encoder."""
         return encode_to_json_bytes(content)
 
 
 class ServerSentEvent:
+    """Wraps a Pydantic model as an SSE-formatted payload."""
+
     def __init__(self, data: BaseModel, *args, **kwargs):
+        """Initialise with a Pydantic *data* model to be sent as an SSE event."""
         # NOTE: SSE should use `\n\n` as separator
         # https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
         self._sep = b"\n\n"
@@ -28,5 +32,6 @@ class ServerSentEvent:
         self.data = data
 
     def encode(self) -> bytes:
+        """Serialise the data model to ``data: <json>\n\n`` bytes."""
         as_dict = self.data.model_dump()
         return self._pre + encode_to_json_bytes(as_dict) + self._sep

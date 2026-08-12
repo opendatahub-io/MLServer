@@ -29,20 +29,27 @@ class Endpoints:
     """
 
     def __init__(self, data_plane: DataPlane):
+        """Bind the endpoints to the given data plane handler."""
         self._data_plane = data_plane
 
     async def live(self) -> Response:
+        """Handle ``GET /v2/health/live``: return 200 if the server is live,
+        otherwise 400."""
         is_live = await self._data_plane.live()
         return Response(status_code=to_status_code(is_live))
 
     async def ready(self) -> Response:
+        """Handle ``GET /v2/health/ready``: return 200 if the server is ready
+        to accept inference requests, otherwise 400."""
         is_ready = await self._data_plane.ready()
         return Response(status_code=to_status_code(is_ready))
 
     async def openapi(self) -> dict:
+        """Return the server-level OpenAPI schema for the V2 dataplane."""
         return get_openapi_schema()
 
     async def docs(self) -> HTMLResponse:
+        """Serve the Swagger UI page for the server-level OpenAPI schema."""
         openapi_url = "/v2/docs/dataplane.json"
         title = "MLServer API Docs"
         return get_swagger_ui_html(openapi_url=openapi_url, title=title)
@@ -50,6 +57,8 @@ class Endpoints:
     async def model_openapi(
         self, model_name: str, model_version: str | None = None
     ) -> dict:
+        """Return the OpenAPI schema scoped to a specific model, verifying
+        that the model exists first via its metadata."""
         # NOTE: Right now, we use the `model_metadata` method to check that the
         # model exists.
         # In the future, we will use this metadata to fill in more model
@@ -60,6 +69,7 @@ class Endpoints:
     async def model_docs(
         self, model_name: str, model_version: str | None = None
     ) -> HTMLResponse:
+        """Serve the Swagger UI page scoped to a specific model."""
         # NOTE: Right now, we use the `model_metadata` method to check that the
         # model exists.
         # In the future, we will use this metadata to fill in more model
@@ -76,18 +86,25 @@ class Endpoints:
     async def model_ready(
         self, model_name: str, model_version: str | None = None
     ) -> Response:
+        """Handle ``GET /v2/models/{name}/ready``: return 200 if the model
+        is ready for inference, otherwise 400."""
         is_ready = await self._data_plane.model_ready(model_name, model_version)
         return Response(status_code=to_status_code(is_ready))
 
     async def metadata(self) -> MetadataServerResponse:
+        """Handle ``GET /v2``: return server name, version, and extensions."""
         return await self._data_plane.metadata()
 
     async def runtimes(self) -> RuntimeSecurityResponse:
+        """Handle ``GET /v2/runtimes``: return security mode and allowed
+        model implementations."""
         return await self._data_plane.runtimes()
 
     async def model_metadata(
         self, model_name: str, model_version: str | None = None
     ) -> MetadataModelResponse:
+        """Handle ``GET /v2/models/{name}``: return model metadata including
+        inputs, outputs, and parameters."""
         return await self._data_plane.model_metadata(model_name, model_version)
 
     async def infer(
@@ -157,16 +174,23 @@ async def _as_sse(
 
 
 class ModelRepositoryEndpoints:
+    """REST endpoints for model repository management (index, load, unload)."""
+
     def __init__(self, handlers: ModelRepositoryHandlers):
+        """Bind the repository endpoints to the given model repository handlers."""
         self._handlers = handlers
 
     async def index(self, payload: RepositoryIndexRequest) -> RepositoryIndexResponse:
+        """Return an index of models in the repository, optionally filtered
+        by readiness."""
         return await self._handlers.index(payload)
 
     async def load(self, model_name: str) -> Response:
+        """Load a model into the inference server from the repository."""
         loaded = await self._handlers.load(name=model_name)
         return Response(status_code=to_status_code(loaded))
 
     async def unload(self, model_name: str) -> Response:
+        """Unload a model from the inference server."""
         unloaded = await self._handlers.unload(name=model_name)
         return Response(status_code=to_status_code(unloaded))

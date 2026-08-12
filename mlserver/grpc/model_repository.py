@@ -27,13 +27,20 @@ def _deprecated(f: Callable):
 
 
 class ModelRepositoryServicer(ModelRepositoryServiceServicer):
+    """Deprecated gRPC servicer for the Model Repository API.
+
+    Use the ``GRPCInferenceService`` endpoints instead.
+    """
+
     def __init__(self, handlers: ModelRepositoryHandlers):
+        """Initialise with the shared :class:`ModelRepositoryHandlers`."""
         self._handlers = handlers
 
     @_deprecated
     async def RepositoryIndex(
         self, request: mr_pb.RepositoryIndexRequest, context
     ) -> mr_pb.RepositoryIndexResponse:
+        """Return the index of all models in the repository."""
         payload = RepositoryIndexRequestConverter.to_types(request)
         index = await self._handlers.index(payload)
         return RepositoryIndexResponseConverter.from_types(  # type: ignore
@@ -45,6 +52,7 @@ class ModelRepositoryServicer(ModelRepositoryServiceServicer):
     async def RepositoryModelLoad(
         self, request: mr_pb.RepositoryModelLoadRequest, context
     ) -> mr_pb.RepositoryModelLoadResponse:
+        """Load or reload a model by name from the repository."""
         await self._handlers.load(request.model_name)
         return mr_pb.RepositoryModelLoadResponse()
 
@@ -53,5 +61,6 @@ class ModelRepositoryServicer(ModelRepositoryServiceServicer):
     async def RepositoryModelUnload(
         self, request: mr_pb.RepositoryModelUnloadRequest, context
     ) -> mr_pb.RepositoryModelUnloadResponse:
+        """Unload a model by name, releasing its resources."""
         await self._handlers.unload(request.model_name)
         return mr_pb.RepositoryModelUnloadResponse()

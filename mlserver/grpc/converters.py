@@ -42,10 +42,13 @@ def _merge_map(pb_map: Mapping, value_dict: Mapping) -> Mapping:
 
 
 class ServerMetadataResponseConverter:
+    """Convert between ``ServerMetadataResponse`` protobuf and internal types."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.ServerMetadataResponse
     ) -> types.MetadataServerResponse:
+        """Deserialise a protobuf ``ServerMetadataResponse`` into a ``MetadataServerResponse``."""
         return types.MetadataServerResponse(
             name=pb_object.name,
             version=pb_object.version,
@@ -56,6 +59,7 @@ class ServerMetadataResponseConverter:
     def from_types(
         cls, type_object: types.MetadataServerResponse
     ) -> pb.ServerMetadataResponse:
+        """Serialise a ``MetadataServerResponse`` into its protobuf representation."""
         return pb.ServerMetadataResponse(
             name=type_object.name,
             version=type_object.version,
@@ -64,10 +68,14 @@ class ServerMetadataResponseConverter:
 
 
 class RuntimeSecurityResponseConverter:
+    """Convert between ``RuntimeSecurityResponse`` protobuf and internal types."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.RuntimeSecurityResponse
     ) -> types.RuntimeSecurityResponse:
+        """Deserialise a protobuf ``RuntimeSecurityResponse``, unwrapping the optional
+        ``allowed_model_implementations`` wrapper message."""
         # Unwrap the optional wrapper message
         allowed = None
         if pb_object.HasField("allowed_model_implementations"):
@@ -82,6 +90,8 @@ class RuntimeSecurityResponseConverter:
     def from_types(
         cls, type_object: types.RuntimeSecurityResponse
     ) -> pb.RuntimeSecurityResponse:
+        """Serialise a ``RuntimeSecurityResponse``, wrapping the allowed implementations
+        list in its protobuf wrapper message when present."""
         # Wrap the list in the wrapper message if present, otherwise omit the field
         # Note: use_enum_values=True means mode is already a str at runtime
         if type_object.allowed_model_implementations is not None:
@@ -99,10 +109,14 @@ class RuntimeSecurityResponseConverter:
 
 
 class ModelMetadataResponseConverter:
+    """Convert between ``ModelMetadataResponse`` protobuf and internal types."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.ModelMetadataResponse
     ) -> types.MetadataModelResponse:
+        """Deserialise a protobuf ``ModelMetadataResponse`` including its
+        input/output tensor metadata and parameters."""
         metadata = types.MetadataModelResponse(
             name=pb_object.name,
             platform=pb_object.platform,
@@ -126,6 +140,7 @@ class ModelMetadataResponseConverter:
     def from_types(
         cls, type_object: types.MetadataModelResponse
     ) -> pb.ModelMetadataResponse:
+        """Serialise a ``MetadataModelResponse`` into its protobuf representation."""
         metadata = pb.ModelMetadataResponse(
             name=type_object.name,
             platform=type_object.platform,
@@ -152,10 +167,13 @@ class ModelMetadataResponseConverter:
 
 
 class TensorMetadataConverter:
+    """Convert between ``TensorMetadata`` protobuf and internal ``MetadataTensor``."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.ModelMetadataResponse.TensorMetadata
     ) -> types.MetadataTensor:
+        """Deserialise a protobuf ``TensorMetadata`` into a ``MetadataTensor``."""
         return types.MetadataTensor(
             name=pb_object.name,
             datatype=pb_object.datatype,
@@ -167,6 +185,7 @@ class TensorMetadataConverter:
     def from_types(
         cls, type_object: types.MetadataTensor
     ) -> pb.ModelMetadataResponse.TensorMetadata:
+        """Serialise a ``MetadataTensor`` into its protobuf representation."""
         tensor_metadata = pb.ModelMetadataResponse.TensorMetadata(
             name=type_object.name,
             datatype=str(type_object.datatype),
@@ -183,8 +202,12 @@ class TensorMetadataConverter:
 
 
 class ModelInferRequestConverter:
+    """Convert between ``ModelInferRequest`` protobuf and internal ``InferenceRequest``."""
+
     @classmethod
     def to_types(cls, pb_object: pb.ModelInferRequest) -> types.InferenceRequest:
+        """Deserialise a protobuf ``ModelInferRequest``, injecting any raw input
+        contents into the corresponding tensor data fields."""
         inference_request = types.InferenceRequest.construct(
             id=pb_object.id,
             parameters=ParametersConverter.to_types(pb_object.parameters),
@@ -215,6 +238,8 @@ class ModelInferRequestConverter:
         model_version: str = "",
         use_raw: bool = False,
     ) -> pb.ModelInferRequest:
+        """Serialise an ``InferenceRequest`` into a protobuf ``ModelInferRequest``.
+        When *use_raw* is ``True``, tensor data is sent via ``raw_input_contents``."""
         if use_raw:
             # Extract the raw data in advance, to ensure the `data` field of
             # the input objects is empty
@@ -252,10 +277,13 @@ class ModelInferRequestConverter:
 
 
 class InferInputTensorConverter:
+    """Convert between ``InferInputTensor`` protobuf and internal ``RequestInput``."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.ModelInferRequest.InferInputTensor
     ) -> types.RequestInput:
+        """Deserialise a protobuf ``InferInputTensor`` into a ``RequestInput``."""
         return types.RequestInput.construct(
             name=pb_object.name,
             shape=list(pb_object.shape),
@@ -268,6 +296,7 @@ class InferInputTensorConverter:
     def from_types(
         cls, type_object: types.RequestInput
     ) -> pb.ModelInferRequest.InferInputTensor:
+        """Serialise a ``RequestInput`` into its protobuf representation."""
         infer_input_tensor = pb.ModelInferRequest.InferInputTensor(
             name=type_object.name,
             shape=type_object.shape,
@@ -287,10 +316,13 @@ class InferInputTensorConverter:
 
 
 class InferRequestedOutputTensorConverter:
+    """Convert between ``InferRequestedOutputTensor`` protobuf and ``RequestOutput``."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.ModelInferRequest.InferRequestedOutputTensor
     ) -> types.RequestOutput:
+        """Deserialise a protobuf ``InferRequestedOutputTensor`` into a ``RequestOutput``."""
         return types.RequestOutput.construct(
             name=pb_object.name,
             parameters=ParametersConverter.to_types(pb_object.parameters),
@@ -300,6 +332,7 @@ class InferRequestedOutputTensorConverter:
     def from_types(
         cls, type_object: types.RequestOutput
     ) -> pb.ModelInferRequest.InferRequestedOutputTensor:
+        """Serialise a ``RequestOutput`` into its protobuf representation."""
         model_infer_request = pb.ModelInferRequest.InferRequestedOutputTensor(
             name=type_object.name,
         )
@@ -314,10 +347,14 @@ class InferRequestedOutputTensorConverter:
 
 
 class ParametersConverter:
+    """Convert between a protobuf ``InferParameter`` map and internal ``Parameters``."""
+
     @classmethod
     def to_types(
         cls, pb_object: Mapping[str, pb.InferParameter]
     ) -> types.Parameters | None:
+        """Deserialise a protobuf parameter map into a ``Parameters`` instance.
+        Returns ``None`` when the map is empty."""
         if not pb_object:
             return None
 
@@ -331,6 +368,7 @@ class ParametersConverter:
     def from_types(
         cls, type_object: types.Parameters
     ) -> Mapping[str, pb.InferParameter]:
+        """Serialise a ``Parameters`` instance into a protobuf ``InferParameter`` map."""
         pb_object = {}
         as_dict = type_object.model_dump(by_alias=True)
 
@@ -358,8 +396,11 @@ class ParametersConverter:
 
 
 class InferTensorContentsConverter:
+    """Convert between ``InferTensorContents`` protobuf and internal ``TensorData``."""
+
     @classmethod
     def to_types(cls, pb_object: pb.InferTensorContents) -> types.TensorData:
+        """Deserialise a protobuf ``InferTensorContents`` into a ``TensorData``."""
         data = _get_value(pb_object, default=[])
         as_list = list(data)
         return types.TensorData(root=as_list)
@@ -368,6 +409,8 @@ class InferTensorContentsConverter:
     def from_types(
         cls, type_object: types.TensorData, datatype: Datatype
     ) -> pb.InferTensorContents:
+        """Serialise ``TensorData`` into a protobuf ``InferTensorContents``,
+        routing values to the correct typed field based on *datatype*."""
         contents = cls._get_contents(type_object, datatype)
         return pb.InferTensorContents(**contents)
 
@@ -378,8 +421,12 @@ class InferTensorContentsConverter:
 
 
 class ModelInferResponseConverter:
+    """Convert between ``ModelInferResponse`` protobuf and internal ``InferenceResponse``."""
+
     @classmethod
     def to_types(cls, pb_object: pb.ModelInferResponse) -> types.InferenceResponse:
+        """Deserialise a protobuf ``ModelInferResponse``, injecting any raw output
+        contents into the corresponding tensor data fields."""
         inference_response = types.InferenceResponse.construct(
             id=pb_object.id,
             model_name=pb_object.model_name,
@@ -406,6 +453,8 @@ class ModelInferResponseConverter:
     def from_types(
         cls, type_object: types.InferenceResponse, use_raw: bool = False
     ) -> pb.ModelInferResponse:
+        """Serialise an ``InferenceResponse`` into a protobuf ``ModelInferResponse``.
+        When *use_raw* is ``True``, tensor data is sent via ``raw_output_contents``."""
         if use_raw:
             # Extract the raw data in advance, to ensure the `data` field of
             # the output objects is empty
@@ -439,10 +488,13 @@ class ModelInferResponseConverter:
 
 
 class InferOutputTensorConverter:
+    """Convert between ``InferOutputTensor`` protobuf and internal ``ResponseOutput``."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.ModelInferResponse.InferOutputTensor
     ) -> types.ResponseOutput:
+        """Deserialise a protobuf ``InferOutputTensor`` into a ``ResponseOutput``."""
         return types.ResponseOutput(
             name=pb_object.name,
             shape=list(pb_object.shape),
@@ -455,6 +507,7 @@ class InferOutputTensorConverter:
     def from_types(
         cls, type_object: types.ResponseOutput
     ) -> pb.ModelInferResponse.InferOutputTensor:
+        """Serialise a ``ResponseOutput`` into its protobuf representation."""
         infer_output_tensor = pb.ModelInferResponse.InferOutputTensor(
             name=type_object.name,
             shape=type_object.shape,
@@ -474,10 +527,14 @@ class InferOutputTensorConverter:
 
 
 class RepositoryIndexRequestConverter:
+    """Convert between ``RepositoryIndexRequest`` protobuf and internal types.
+    Supports both the dataplane and model-repository protobuf variants."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.RepositoryIndexRequest | mr_pb.RepositoryIndexRequest
     ) -> types.RepositoryIndexRequest:
+        """Deserialise a protobuf ``RepositoryIndexRequest`` into its internal type."""
         return types.RepositoryIndexRequest(
             ready=pb_object.ready,
         )
@@ -486,14 +543,19 @@ class RepositoryIndexRequestConverter:
     def from_types(
         cls, type_object: types.RepositoryIndexRequest
     ) -> pb.RepositoryIndexRequest | mr_pb.RepositoryIndexRequest:
+        """Serialise a ``RepositoryIndexRequest`` -- not yet implemented."""
         raise NotImplementedError("Implement me")
 
 
 class RepositoryIndexResponseConverter:
+    """Convert between ``RepositoryIndexResponse`` protobuf and internal types.
+    Supports both the dataplane and model-repository protobuf variants."""
+
     @classmethod
     def to_types(
         cls, pb_object: pb.RepositoryIndexResponse | mr_pb.RepositoryIndexResponse
     ) -> types.RepositoryIndexResponse:
+        """Deserialise a protobuf ``RepositoryIndexResponse`` -- not yet implemented."""
         raise NotImplementedError("Implement me")
 
     @classmethod
@@ -502,6 +564,8 @@ class RepositoryIndexResponseConverter:
         type_object: types.RepositoryIndexResponse,
         use_model_repository: bool = False,
     ) -> pb.RepositoryIndexResponse | mr_pb.RepositoryIndexResponse:
+        """Serialise a ``RepositoryIndexResponse`` into a protobuf message.
+        Uses the model-repository variant when *use_model_repository* is ``True``."""
         models = [
             RepositoryIndexResponseItemConverter.from_types(
                 model, use_model_repository=use_model_repository
@@ -515,6 +579,8 @@ class RepositoryIndexResponseConverter:
 
 
 class RepositoryIndexResponseItemConverter:
+    """Convert a single model index entry between protobuf and internal types."""
+
     @classmethod
     def to_types(
         cls,
@@ -523,6 +589,7 @@ class RepositoryIndexResponseItemConverter:
             | mr_pb.RepositoryIndexResponse.ModelIndex
         ),
     ) -> types.RepositoryIndexResponseItem:
+        """Deserialise a protobuf ``ModelIndex`` -- not yet implemented."""
         raise NotImplementedError("Implement me")
 
     @classmethod
@@ -533,6 +600,8 @@ class RepositoryIndexResponseItemConverter:
     ) -> (
         pb.RepositoryIndexResponse.ModelIndex | mr_pb.RepositoryIndexResponse.ModelIndex
     ):
+        """Serialise a ``RepositoryIndexResponseItem`` into a protobuf ``ModelIndex``.
+        Uses the model-repository variant when *use_model_repository* is ``True``."""
         model_index = pb.RepositoryIndexResponse.ModelIndex(
             name=type_object.name,
             state=str(type_object.state),

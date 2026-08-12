@@ -10,10 +10,14 @@ MLSERVER_MODEL_VERSION_HEADER = "mlserver-version"
 
 
 class KafkaHandlers:
+    """Translates Kafka messages into inference requests and back."""
+
     def __init__(self, data_plane: DataPlane):
+        """Initialise with the *data_plane* used for inference dispatch."""
         self._data_plane = data_plane
 
     async def infer(self, request: KafkaMessage) -> KafkaMessage:
+        """Run inference on a Kafka message and return the response as a KafkaMessage."""
         inference_request = InferenceRequest(**request.value)
 
         # Kafka KEY takes precedence over body ID
@@ -33,6 +37,7 @@ class KafkaHandlers:
         )
 
     def _get_model_details(self, request: KafkaMessage) -> tuple[str, str | None]:
+        """Extract model name and optional version from Kafka message headers."""
         headers = request.headers
 
         # TODO: Update header with consistency with other headeres

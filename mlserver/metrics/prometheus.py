@@ -19,6 +19,7 @@ PROMETHEUS_MULTIPROC_DIR = "PROMETHEUS_MULTIPROC_DIR"
 
 
 def configure_metrics(settings: Settings):
+    """Set up Prometheus multiprocess mode when parallel workers are enabled."""
     if not settings.parallel_workers:
         return
 
@@ -40,6 +41,7 @@ async def _remove_if_exists(path: str):
 
 
 async def stop_metrics(settings: Settings, pid: int):
+    """Clean up Prometheus metric files for a terminated worker process."""
     if not settings.parallel_workers:
         return
 
@@ -52,12 +54,16 @@ async def stop_metrics(settings: Settings, pid: int):
 
 
 class PrometheusEndpoint:
+    """FastAPI endpoint handler that serves Prometheus metrics."""
+
     def __init__(self, settings: Settings):
+        """Initialise with server settings and configure multiprocess metrics."""
         self._settings = settings
         configure_metrics(self._settings)
 
     @property
     def _registry(self) -> CollectorRegistry:
+        """Return the appropriate Prometheus registry for the current mode."""
         if not self._settings.parallel_workers:
             return REGISTRY
 
@@ -67,6 +73,7 @@ class PrometheusEndpoint:
         return registry
 
     def handle_metrics(self, req: Request) -> Response:
+        """Handle a metrics scrape request and return the latest exposition."""
         headers = {"Content-Type": CONTENT_TYPE_LATEST}
         return Response(
             generate_latest(self._registry),

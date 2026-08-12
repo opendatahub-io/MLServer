@@ -5,7 +5,10 @@ from ..errors import MLServerError
 
 
 class EnvironmentNotFound(MLServerError):
+    """Raised when a worker environment with the given hash does not exist."""
+
     def __init__(self, model: MLModel, env_hash: str):
+        """Initialise with the model and the missing environment hash."""
         msg = (
             f"Environment with hash '{env_hash}' was not found for model '{model.name}'"
         )
@@ -17,7 +20,10 @@ class EnvironmentNotFound(MLServerError):
 
 
 class WorkerStop(MLServerError):
+    """Raised when a worker process terminates unexpectedly."""
+
     def __init__(self, exit_code: int):
+        """Initialise with the worker's exit code."""
         msg = f"Worker process stopped unexpectedly with exit code {exit_code}."
         super().__init__(msg, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -33,6 +39,7 @@ class WorkerError(MLServerError):
     """
 
     def __init__(self, exc: BaseException):
+        """Initialise by wrapping the original worker exception."""
         msg = str(exc)
         if isinstance(exc, BaseException):
             exc_class = exc.__class__

@@ -20,6 +20,7 @@ def to_status_code(flag: bool, error_code: int = status.HTTP_400_BAD_REQUEST) ->
 def matches(
     route: APIRoute, custom_handler: CustomHandler, handler_method: Callable
 ) -> bool:
+    """Return True if *route* matches the given custom handler and method."""
     if route.endpoint != handler_method:
         return False
 
@@ -32,6 +33,7 @@ def matches(
 
 
 def to_scope(custom_handler: CustomHandler) -> Scope:
+    """Build an ASGI scope dict from a CustomHandler's method and path."""
     return {
         "type": "http",
         "method": custom_handler.rest_method,

@@ -25,7 +25,11 @@ _GRPC_HEALTH_METHODS = frozenset(
 
 
 class LoggingInterceptor(ServerInterceptor):
+    """gRPC server interceptor that logs each incoming RPC method name.
+    Health-check RPCs are skipped by default to reduce noise."""
+
     def __init__(self, *, skip_health: bool = True):
+        """Configure whether health-check RPCs are excluded from logging."""
         self._skip_health = skip_health
 
     def _is_health_check(self, method: str) -> bool:
@@ -36,6 +40,8 @@ class LoggingInterceptor(ServerInterceptor):
         continuation: Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]],
         handler_call_details: HandlerCallDetails,
     ) -> RpcMethodHandler:
+        """Log the RPC method name unless it is a health check and
+        *skip_health* is enabled, then delegate to the next handler."""
         method = handler_call_details.method
         if not (self._skip_health and self._is_health_check(method)):
             logger.info(method)
@@ -51,6 +57,8 @@ class PromServerInterceptor(ServerInterceptor):
     """
 
     def __init__(self, *args, **kwargs):
+        """Initialise the underlying ``py_grpc_prometheus`` interceptor and
+        build a status-code lookup table for integer-to-``StatusCode`` conversion."""
         self._interceptor = _PromServerInterceptor(*args, **kwargs)
         # We need a status code mapping to ensure we can convert from an int:
         # https://groups.google.com/g/grpc-io/c/EdIXjMEaOyw/m/d3DeqmrJAAAJ
@@ -61,6 +69,8 @@ class PromServerInterceptor(ServerInterceptor):
         continuation: Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]],
         handler_call_details: HandlerCallDetails,
     ) -> RpcMethodHandler:
+        """Wrap the RPC handler to record Prometheus metrics (counters,
+        histograms) for each call."""
         method_call = grpc_utils.split_method_call(handler_call_details)
         handler = await continuation(handler_call_details)
 

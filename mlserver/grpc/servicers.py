@@ -34,6 +34,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     def __init__(
         self, data_plane: DataPlane, model_repository_handlers: ModelRepositoryHandlers
     ):
+        """Bind the servicer to the given data plane and model repository handlers."""
         super().__init__()
         self._data_plane = data_plane
         self._model_repository_handlers = model_repository_handlers
@@ -41,12 +42,14 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def ServerLive(
         self, request: pb.ServerLiveRequest, context
     ) -> pb.ServerLiveResponse:
+        """Return whether the inference server is live."""
         is_live = await self._data_plane.live()
         return pb.ServerLiveResponse(live=is_live)
 
     async def ServerReady(
         self, request: pb.ServerReadyRequest, context
     ) -> pb.ServerReadyResponse:
+        """Return whether the inference server is ready to accept requests."""
         is_ready = await self._data_plane.ready()
         return pb.ServerReadyResponse(ready=is_ready)
 
@@ -54,6 +57,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def ModelReady(
         self, request: pb.ModelReadyRequest, context
     ) -> pb.ModelReadyResponse:
+        """Return whether a specific model is ready for inference."""
         is_model_ready = await self._data_plane.model_ready(
             name=request.name, version=request.version
         )
@@ -62,6 +66,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def ServerMetadata(
         self, request: pb.ServerMetadataRequest, context
     ) -> pb.ServerMetadataResponse:
+        """Return server name, version, and supported extensions."""
         metadata = await self._data_plane.metadata()
         return ServerMetadataResponseConverter.from_types(metadata)
 
@@ -69,6 +74,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def RuntimeSecurity(
         self, request: pb.RuntimeSecurityRequest, context
     ) -> pb.RuntimeSecurityResponse:
+        """Return security mode and allowed model implementations."""
         security = await self._data_plane.runtimes()
         return RuntimeSecurityResponseConverter.from_types(security)
 
@@ -76,6 +82,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def ModelMetadata(
         self, request: pb.ModelMetadataRequest, context
     ) -> pb.ModelMetadataResponse:
+        """Return metadata (inputs, outputs, parameters) for a specific model."""
         metadata = await self._data_plane.model_metadata(
             name=request.name, version=request.version
         )
@@ -85,6 +92,8 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def ModelInfer(
         self, request: pb.ModelInferRequest, context: grpc.ServicerContext
     ) -> pb.ModelInferResponse:
+        """Run a single inference request against a model and return the response.
+        HTTP headers from gRPC metadata are forwarded into the payload."""
         use_raw = InferenceServicer._GetReturnRaw(request)
         payload = self._InsertHeaders(request, context)
         result = await self._data_plane.infer(
@@ -99,6 +108,8 @@ class InferenceServicer(GRPCInferenceServiceServicer):
         requests_stream: AsyncIterator[pb.ModelInferRequest],
         context: grpc.ServicerContext,
     ) -> AsyncIterator[pb.ModelInferResponse]:
+        """Handle bidirectional streaming inference.  Consumes the first request
+        to determine the target model, then yields responses as they arrive."""
         async for request in requests_stream:
             break
 
@@ -149,6 +160,8 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def RepositoryIndex(
         self, request: pb.RepositoryIndexRequest, context
     ) -> pb.RepositoryIndexResponse:
+        """Return an index of models in the model repository, optionally
+        filtered by readiness."""
         payload = RepositoryIndexRequestConverter.to_types(request)
         index = await self._model_repository_handlers.index(payload)
         return RepositoryIndexResponseConverter.from_types(index)  # type: ignore
@@ -157,6 +170,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def RepositoryModelLoad(
         self, request: pb.RepositoryModelLoadRequest, context
     ) -> pb.RepositoryModelLoadResponse:
+        """Load a model into the inference server from the model repository."""
         await self._model_repository_handlers.load(request.model_name)
         return pb.RepositoryModelLoadResponse()
 
@@ -164,5 +178,6 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     async def RepositoryModelUnload(
         self, request: pb.RepositoryModelUnloadRequest, context
     ) -> pb.RepositoryModelUnloadResponse:
+        """Unload a model from the inference server."""
         await self._model_repository_handlers.unload(request.model_name)
         return pb.RepositoryModelUnloadResponse()

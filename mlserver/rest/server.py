@@ -20,12 +20,17 @@ class _NoSignalServer(uvicorn.Server):
 
 
 class RESTServer:
+    """HTTP/REST inference server backed by Uvicorn and FastAPI.
+    Implements the V2 Inference Protocol REST endpoints and manages
+    the lifecycle of custom per-model route handlers."""
+
     def __init__(
         self,
         settings: Settings,
         data_plane: DataPlane,
         model_repository_handlers: ModelRepositoryHandlers,
     ):
+        """Create the REST server and its underlying FastAPI application."""
         self._settings = settings
         self._data_plane = data_plane
         self._model_repository_handlers = model_repository_handlers
@@ -36,6 +41,7 @@ class RESTServer:
         )
 
     async def add_custom_handlers(self, model: MLModel) -> MLModel:
+        """Register any custom REST routes declared by the model."""
         handlers = get_custom_handlers(model)
         for custom_handler, handler_method in handlers:
             self._app.add_api_route(
@@ -47,6 +53,7 @@ class RESTServer:
         return model
 
     async def delete_custom_handlers(self, model: MLModel) -> MLModel:
+        """Remove custom REST routes previously registered for the model."""
         handlers = get_custom_handlers(model)
         if len(handlers) == 0:
             return model
@@ -62,6 +69,8 @@ class RESTServer:
         return model
 
     async def start(self):
+        """Build the Uvicorn config, optionally filter health-check access
+        logs, and start serving HTTP requests."""
         cfg = self._get_config()
         self._server = _NoSignalServer(cfg)
         if self._settings.access_log and not self._settings.debug:
@@ -100,6 +109,8 @@ class RESTServer:
         return uvicorn.Config(self._app, **kwargs)
 
     async def stop(self, sig: int | None = None):
+        """Signal the Uvicorn server to begin graceful shutdown and clear
+        any custom access-log filters."""
         if sig is None:
             # `sig` is no longer optional for `handle_exit` in
             # latest `uvicorn`

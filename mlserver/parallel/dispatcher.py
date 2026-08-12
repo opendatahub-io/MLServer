@@ -26,7 +26,11 @@ QUEUE_METRIC_NAME = "parallel_request_queue"
 
 
 class AsyncResponses:
+    """Tracks in-flight requests and resolves their asyncio futures when
+    worker responses arrive."""
+
     def __init__(self) -> None:
+        """Initialise empty future and worker tracking maps."""
         self._futures: dict[str, Future[ModelResponseMessage]] = {}
 
         # _workers_map keeps track of which in-flight requests are being served
@@ -130,7 +134,11 @@ class AsyncResponses:
 
 
 class Dispatcher:
+    """Routes inference requests to workers via round-robin and processes
+    their responses from a shared queue."""
+
     def __init__(self, workers: dict[int, Worker], responses: Queue):
+        """Set up round-robin worker rotation and the response processing loop."""
         self._responses = responses
         self._workers = workers
         self._workers_round_robin = self._reset_round_robin()
@@ -176,6 +184,7 @@ class Dispatcher:
         self._async_responses.cancel(worker, exit_code)
 
     def start(self):
+        """Start the background response-processing loop."""
         self._active = True
         self._process_responses_task = schedule_with_callback(
             self._process_responses(), self._process_responses_cb
@@ -209,6 +218,7 @@ class Dispatcher:
     async def dispatch_request(
         self, request_message: ModelRequestMessage
     ) -> ModelResponseMessage:
+        """Send a request to the next available worker and await the response."""
         worker, wpid = self._get_worker()
         worker.send_request(request_message)
 
@@ -225,6 +235,7 @@ class Dispatcher:
     async def dispatch_update(
         self, model_update: ModelUpdateMessage
     ) -> list[ModelResponseMessage]:
+        """Broadcast a model update to all workers and await their responses."""
         async with self._worker_starting_lock:
             return await asyncio.gather(
                 *[
@@ -236,6 +247,7 @@ class Dispatcher:
     async def dispatch_update_to_worker(
         self, worker: Worker, model_update: ModelUpdateMessage
     ) -> ModelResponseMessage:
+        """Send a model update to a single worker with a unique message ID."""
         # NOTE: Need to rewrite the UUID to ensure each worker sends back a
         # unique result
         worker_update = model_update.copy()
@@ -244,6 +256,7 @@ class Dispatcher:
         return await self._async_responses.schedule_and_wait(worker_update, worker)
 
     async def stop(self):
+        """Shut down the thread executor and cancel the response-processing loop."""
         self._executor.shutdown()
         if self._process_responses_task is not None:
             await cancel_task(self._process_responses_task)

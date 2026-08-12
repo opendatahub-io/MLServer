@@ -20,7 +20,12 @@ class _NoSignalServer(uvicorn.Server):
 
 
 class MetricsServer:
+    """Standalone HTTP server that exposes a Prometheus scraping endpoint
+    for inference metrics."""
+
     def __init__(self, settings: Settings):
+        """Create the metrics server with a Prometheus endpoint at the
+        configured metrics path."""
         self._settings = settings
         self._endpoint = PrometheusEndpoint(settings)
         self._app = self._get_app()
@@ -31,12 +36,14 @@ class MetricsServer:
         return app
 
     async def on_worker_stop(self, worker: "Worker") -> None:
+        """Clean up metrics state for a stopped parallel worker process."""
         if not worker.pid:
             return
 
         await stop_metrics(self._settings, worker.pid)
 
     async def start(self):
+        """Start the Uvicorn metrics server and log the scraping endpoint URL."""
         cfg = self._get_config()
         self._server = _NoSignalServer(cfg)
 
@@ -73,6 +80,8 @@ class MetricsServer:
         return uvicorn.Config(self._app, **kwargs)
 
     async def stop(self, sig: int | None = None):
+        """Stop metrics collection for the current process and signal the
+        Uvicorn server to shut down gracefully."""
         if sig is None:
             # `sig` is no longer optional for `handle_exit` in
             # latest `uvicorn`

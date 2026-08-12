@@ -9,9 +9,11 @@ from ..settings import Settings
 from .logging import logger
 
 END_OF_QUEUE = None
+"""Sentinel value placed on a queue to signal termination."""
 
 
 def configure_inference_pool(settings: Settings):
+    """Set the multiprocessing start method to 'spawn' when parallel workers are enabled."""
     if not settings.parallel_workers:
         return
 
@@ -29,6 +31,7 @@ def configure_inference_pool(settings: Settings):
 
 
 async def terminate_queue(queue: Queue):
+    """Send the sentinel value to *queue* to signal worker termination."""
     try:
         # Send sentinel value to terminate queue
         queue.put(END_OF_QUEUE)
@@ -38,6 +41,7 @@ async def terminate_queue(queue: Queue):
 
 
 async def cancel_task(task: Task):
+    """Cancel an asyncio *task* and suppress the CancelledError."""
     try:
         task.cancel()
         await task

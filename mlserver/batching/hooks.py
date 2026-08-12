@@ -12,6 +12,8 @@ _AdaptiveBatchingAttr = "__adaptive_batching__"
 
 
 class InvalidBatchingMethod(MLServerError):
+    """Raised when a method cannot be used for adaptive batching."""
+
     def __init__(self, method_name: str, reason: str | None = None):
         msg = f"Method {method_name} can't be used for adaptive batching"
         if reason:
@@ -21,6 +23,7 @@ class InvalidBatchingMethod(MLServerError):
 
 
 def _get_batcher(f: Callable) -> AdaptiveBatcher:
+    """Retrieve the AdaptiveBatcher instance attached to the model owning *f*."""
     wrapped_f = get_wrapped_method(f)
     model = _get_model(f)
 
@@ -33,6 +36,7 @@ def _get_batcher(f: Callable) -> AdaptiveBatcher:
 
 
 def _get_model(f: Callable) -> MLModel:
+    """Return the MLModel instance bound to the method *f*."""
     wrapped_f = get_wrapped_method(f)
     if not hasattr(wrapped_f, "__self__"):
         raise InvalidBatchingMethod(wrapped_f.__name__, reason="method is not bound")
@@ -79,6 +83,7 @@ def not_implemented_warning(
 
 
 async def load_batching(model: MLModel) -> MLModel:
+    """Attach an AdaptiveBatcher to *model* and decorate its predict methods."""
     if model.settings.max_batch_size <= 1:
         return model
 
