@@ -183,65 +183,65 @@
   <!--  ANIMATED FLOW ARROWS                                  -->
   <!-- ═══════════════════════════════════════════════════════ -->
 
-  <!-- Client → Ingress -->
+  <!-- Client → Ingress (vertical) -->
   <path d="M 65,135 L 65,190" class="flow-arrow flow-down arrow-blue" marker-end="url(#ah-blue)"/>
   <text x="45" y="165" class="arrow-label">HTTP / gRPC</text>
 
-  <!-- Ingress → REST SVC -->
-  <path d="M 95,225 L 180,280" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
+  <!-- Ingress → REST SVC (right then down) -->
+  <path d="M 95,225 L 210,225 L 210,258" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
 
-  <!-- Ingress → gRPC SVC -->
-  <path d="M 95,235 L 300,280" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
+  <!-- Ingress → gRPC SVC (right then down) -->
+  <path d="M 95,235 L 330,235 L 330,258" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
 
-  <!-- REST SVC → MLServer pod -->
-  <path d="M 210,315 L 380,400" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
+  <!-- REST SVC → MLServer pod (down then right) -->
+  <path d="M 210,315 L 210,400 L 380,400" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
 
-  <!-- gRPC SVC → MLServer pod -->
-  <path d="M 330,315 L 395,400" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
+  <!-- gRPC SVC → MLServer pod (down then right) -->
+  <path d="M 330,315 L 330,400 L 390,400" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
 
-  <!-- Metrics SVC → MLServer pod -->
-  <path d="M 450,315 L 425,400" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
+  <!-- Metrics SVC → MLServer pod (down) -->
+  <path d="M 450,315 L 450,400 L 440,400" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
 
-  <!-- KServe → InferenceService CRD -->
-  <path d="M 600,200 L 580,258" class="flow-arrow flow-down arrow-blue" marker-end="url(#ah-blue)"/>
-  <text x="560" y="230" class="arrow-label">reconcile</text>
+  <!-- KServe → InferenceService CRD (down then left) -->
+  <path d="M 600,200 L 600,258" class="flow-arrow flow-down arrow-blue" marker-end="url(#ah-blue)"/>
+  <text x="618" y="230" class="arrow-label">reconcile</text>
 
-  <!-- InferenceService CRD → MLServer pod -->
-  <path d="M 580,315 L 445,400" class="flow-arrow flow-down arrow-blue" marker-end="url(#ah-blue)"/>
-  <text x="540" y="370" class="arrow-label">manage pod</text>
+  <!-- InferenceService CRD → MLServer pod (down then left) -->
+  <path d="M 580,315 L 580,400 L 445,400" class="flow-arrow flow-down arrow-blue" marker-end="url(#ah-blue)"/>
+  <text x="530" y="360" class="arrow-label">manage pod</text>
 
-  <!-- Prometheus → Metrics SVC -->
-  <path d="M 720,165 L 480,275" class="flow-arrow flow-left arrow-red" marker-end="url(#ah-red)"/>
-  <text x="630" y="200" class="arrow-label">scrape :8082</text>
+  <!-- Prometheus → Metrics SVC (left then down) -->
+  <path d="M 720,165 L 480,165 L 480,258" class="flow-arrow flow-left arrow-red" marker-end="url(#ah-red)"/>
+  <text x="600" y="155" class="arrow-label">scrape :8082</text>
 
-  <!-- Prometheus → Grafana -->
+  <!-- Prometheus → Grafana (horizontal) -->
   <path d="M 780,165 L 805,165" class="flow-arrow flow-right arrow-red" marker-end="url(#ah-red)"/>
 
-  <!-- Kafka → MLServer -->
-  <path d="M 952,200 L 952,400 L 445,425" class="flow-arrow flow-slow arrow-purple" marker-end="url(#ah-purple)"/>
-  <text x="750" y="395" class="arrow-label">consume / produce</text>
+  <!-- Kafka → MLServer (down then left) -->
+  <path d="M 952,200 L 952,425 L 445,425" class="flow-arrow flow-slow arrow-purple" marker-end="url(#ah-purple)"/>
+  <text x="700" y="415" class="arrow-label">consume / produce</text>
 
-  <!-- Security ConfigMap → MLServer -->
-  <path d="M 940,282 L 680,425 L 448,425" class="flow-arrow flow-left arrow-red" marker-end="url(#ah-red)"/>
-  <text x="830" y="350" class="arrow-label">mount</text>
+  <!-- Security ConfigMap → MLServer (left then down) -->
+  <path d="M 895,282 L 680,282 L 680,425 L 448,425" class="flow-arrow flow-left arrow-red" marker-end="url(#ah-red)"/>
+  <text x="790" y="272" class="arrow-label">mount</text>
 
-  <!-- MLServer → Runtimes (fan out) -->
-  <path d="M 380,460 L 225,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
-  <path d="M 395,460 L 345,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
-  <path d="M 435,460 L 465,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
-  <path d="M 450,460 L 585,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <!-- MLServer → Runtimes (down then left/right) -->
+  <path d="M 380,460 L 380,490 L 225,490 L 225,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <path d="M 395,460 L 395,490 L 345,490 L 345,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <path d="M 435,460 L 435,490 L 465,490 L 465,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <path d="M 450,460 L 450,490 L 585,490 L 585,548" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
 
-  <!-- MLServer → Model Store -->
-  <path d="M 445,445 L 750,570" class="flow-arrow flow-right arrow-orange" marker-end="url(#ah-orange)"/>
-  <text x="600" y="495" class="arrow-label">load artifacts</text>
+  <!-- MLServer → Model Store (right then down) -->
+  <path d="M 445,445 L 690,445 L 690,570 L 750,570" class="flow-arrow flow-right arrow-orange" marker-end="url(#ah-orange)"/>
+  <text x="690" y="510" class="arrow-label">load artifacts</text>
 
-  <!-- MLServer → S3 -->
-  <path d="M 450,440 L 880,570" class="flow-arrow flow-right arrow-orange" marker-end="url(#ah-orange)"/>
-  <text x="730" y="480" class="arrow-label">fetch remote</text>
+  <!-- MLServer → S3 (right then down) -->
+  <path d="M 450,440 L 700,440 L 700,475 L 910,475 L 910,548" class="flow-arrow flow-right arrow-orange" marker-end="url(#ah-orange)"/>
+  <text x="810" y="465" class="arrow-label">fetch remote</text>
 
   <!-- Response path back: MLServer → REST → Ingress → Client -->
-  <path d="M 395,395 L 220,310" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
-  <path d="M 190,270 L 80,240" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
+  <path d="M 395,395 L 195,395 L 195,310" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
+  <path d="M 195,270 L 80,270 L 80,240" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
   <path d="M 65,200 L 65,135" class="flow-arrow flow-up arrow-green" marker-end="url(#ah-green)"/>
 
   <!-- ═══ FOOTER ═══ -->

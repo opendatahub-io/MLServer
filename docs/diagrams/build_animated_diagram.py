@@ -229,65 +229,65 @@ html = f"""<!DOCTYPE html>
   <!--  ANIMATED FLOW ARROWS                                  -->
   <!-- ═══════════════════════════════════════════════════════ -->
 
-  <!-- Client → Ingress -->
+  <!-- Client → Ingress (vertical) -->
 {arrow("M 65,135 L 65,190", "arrow-blue", "flow-down", "ah-blue",
        "HTTP / gRPC", 45, 165)}
 
-  <!-- Ingress → REST SVC -->
-{arrow("M 95,225 L 180,280", "arrow-blue", "flow-right", "ah-blue")}
+  <!-- Ingress → REST SVC (right then down) -->
+{arrow("M 95,225 L 210,225 L 210,258", "arrow-blue", "flow-right", "ah-blue")}
 
-  <!-- Ingress → gRPC SVC -->
-{arrow("M 95,235 L 300,280", "arrow-blue", "flow-right", "ah-blue")}
+  <!-- Ingress → gRPC SVC (right then down) -->
+{arrow("M 95,235 L 330,235 L 330,258", "arrow-blue", "flow-right", "ah-blue")}
 
-  <!-- REST SVC → MLServer pod -->
-{arrow("M 210,315 L 380,400", "arrow-green", "flow-down", "ah-green")}
+  <!-- REST SVC → MLServer pod (down then right) -->
+{arrow("M 210,315 L 210,400 L 380,400", "arrow-green", "flow-down", "ah-green")}
 
-  <!-- gRPC SVC → MLServer pod -->
-{arrow("M 330,315 L 395,400", "arrow-green", "flow-down", "ah-green")}
+  <!-- gRPC SVC → MLServer pod (down then right) -->
+{arrow("M 330,315 L 330,400 L 390,400", "arrow-green", "flow-down", "ah-green")}
 
-  <!-- Metrics SVC → MLServer pod -->
-{arrow("M 450,315 L 425,400", "arrow-green", "flow-down", "ah-green")}
+  <!-- Metrics SVC → MLServer pod (down) -->
+{arrow("M 450,315 L 450,400 L 440,400", "arrow-green", "flow-down", "ah-green")}
 
-  <!-- KServe → InferenceService CRD -->
-{arrow("M 600,200 L 580,258", "arrow-blue", "flow-down", "ah-blue",
-       "reconcile", 560, 230)}
+  <!-- KServe → InferenceService CRD (down then left) -->
+{arrow("M 600,200 L 600,258", "arrow-blue", "flow-down", "ah-blue",
+       "reconcile", 618, 230)}
 
-  <!-- InferenceService CRD → MLServer pod -->
-{arrow("M 580,315 L 445,400", "arrow-blue", "flow-down", "ah-blue",
-       "manage pod", 540, 370)}
+  <!-- InferenceService CRD → MLServer pod (down then left) -->
+{arrow("M 580,315 L 580,400 L 445,400", "arrow-blue", "flow-down", "ah-blue",
+       "manage pod", 530, 360)}
 
-  <!-- Prometheus → Metrics SVC -->
-{arrow("M 720,165 L 480,275", "arrow-red", "flow-left", "ah-red",
-       "scrape :8082", 630, 200)}
+  <!-- Prometheus → Metrics SVC (left then down) -->
+{arrow("M 720,165 L 480,165 L 480,258", "arrow-red", "flow-left", "ah-red",
+       "scrape :8082", 600, 155)}
 
-  <!-- Prometheus → Grafana -->
+  <!-- Prometheus → Grafana (horizontal) -->
 {arrow("M 780,165 L 805,165", "arrow-red", "flow-right", "ah-red")}
 
-  <!-- Kafka → MLServer -->
-{arrow("M 952,200 L 952,400 L 445,425", "arrow-purple", "flow-slow", "ah-purple",
-       "consume / produce", 750, 395)}
+  <!-- Kafka → MLServer (down then left) -->
+{arrow("M 952,200 L 952,425 L 445,425", "arrow-purple", "flow-slow", "ah-purple",
+       "consume / produce", 700, 415)}
 
-  <!-- Security ConfigMap → MLServer -->
-{arrow("M 940,282 L 680,425 L 448,425", "arrow-red", "flow-left", "ah-red",
-       "mount", 830, 350)}
+  <!-- Security ConfigMap → MLServer (left then down) -->
+{arrow("M 895,282 L 680,282 L 680,425 L 448,425", "arrow-red", "flow-left", "ah-red",
+       "mount", 790, 272)}
 
-  <!-- MLServer → Runtimes (fan out) -->
-{arrow("M 380,460 L 225,548", "arrow-cyan", "flow-down", "ah-cyan")}
-{arrow("M 395,460 L 345,548", "arrow-cyan", "flow-down", "ah-cyan")}
-{arrow("M 435,460 L 465,548", "arrow-cyan", "flow-down", "ah-cyan")}
-{arrow("M 450,460 L 585,548", "arrow-cyan", "flow-down", "ah-cyan")}
+  <!-- MLServer → Runtimes (down then left/right) -->
+{arrow("M 380,460 L 380,490 L 225,490 L 225,548", "arrow-cyan", "flow-down", "ah-cyan")}
+{arrow("M 395,460 L 395,490 L 345,490 L 345,548", "arrow-cyan", "flow-down", "ah-cyan")}
+{arrow("M 435,460 L 435,490 L 465,490 L 465,548", "arrow-cyan", "flow-down", "ah-cyan")}
+{arrow("M 450,460 L 450,490 L 585,490 L 585,548", "arrow-cyan", "flow-down", "ah-cyan")}
 
-  <!-- MLServer → Model Store -->
-{arrow("M 445,445 L 750,570", "arrow-orange", "flow-right", "ah-orange",
-       "load artifacts", 600, 495)}
+  <!-- MLServer → Model Store (right then down) -->
+{arrow("M 445,445 L 690,445 L 690,570 L 750,570", "arrow-orange", "flow-right", "ah-orange",
+       "load artifacts", 690, 510)}
 
-  <!-- MLServer → S3 -->
-{arrow("M 450,440 L 880,570", "arrow-orange", "flow-right", "ah-orange",
-       "fetch remote", 730, 480)}
+  <!-- MLServer → S3 (right then down) -->
+{arrow("M 450,440 L 700,440 L 700,475 L 910,475 L 910,548", "arrow-orange", "flow-right", "ah-orange",
+       "fetch remote", 810, 465)}
 
   <!-- Response path back: MLServer → REST → Ingress → Client -->
-{arrow("M 395,395 L 220,310", "arrow-green", "flow-left", "ah-green")}
-{arrow("M 190,270 L 80,240", "arrow-green", "flow-left", "ah-green")}
+{arrow("M 395,395 L 195,395 L 195,310", "arrow-green", "flow-left", "ah-green")}
+{arrow("M 195,270 L 80,270 L 80,240", "arrow-green", "flow-left", "ah-green")}
 {arrow("M 65,200 L 65,135", "arrow-green", "flow-up", "ah-green")}
 
   <!-- ═══ FOOTER ═══ -->

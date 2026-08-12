@@ -267,71 +267,71 @@ html = f"""<!DOCTYPE html>
   <!--  ANIMATED FLOW ARROWS                                  -->
   <!-- ═══════════════════════════════════════════════════════ -->
 
-  <!-- Client → REST -->
-{arrow("M 112,195 L 193,180", "arrow-blue", "flow-right", "ah-blue")}
-  <!-- Client → gRPC -->
-{arrow("M 112,210 L 193,250", "arrow-blue", "flow-right", "ah-blue")}
+  <!-- Client → REST (right then up) -->
+{arrow("M 112,195 L 155,195 L 155,180 L 193,180", "arrow-blue", "flow-right", "ah-blue")}
+  <!-- Client → gRPC (right then down) -->
+{arrow("M 112,210 L 155,210 L 155,250 L 193,250", "arrow-blue", "flow-right", "ah-blue")}
 
-  <!-- REST → DataPlane -->
+  <!-- REST → DataPlane (horizontal) -->
 {arrow("M 357,185 L 423,185", "arrow-green", "flow-right", "ah-green")}
-  <!-- gRPC → DataPlane -->
-{arrow("M 357,250 L 423,190", "arrow-green", "flow-right", "ah-green")}
+  <!-- gRPC → DataPlane (right then up) -->
+{arrow("M 357,255 L 390,255 L 390,190 L 423,190", "arrow-green", "flow-right", "ah-green")}
 
-  <!-- Kafka → Kafka Consumer -->
-{arrow("M 112,375 L 193,395", "arrow-purple", "flow-right", "ah-purple")}
-  <!-- Kafka Consumer → Middleware -->
-{arrow("M 357,395 L 423,255", "arrow-purple", "flow-right", "ah-purple",
-       "CloudEvents", 390, 310)}
+  <!-- Kafka → Kafka Consumer (horizontal) -->
+{arrow("M 112,380 L 193,380", "arrow-purple", "flow-right", "ah-purple")}
+  <!-- Kafka Consumer → Middleware (right then up) -->
+{arrow("M 357,395 L 390,395 L 390,255 L 423,255", "arrow-purple", "flow-right", "ah-purple",
+       "CloudEvents", 390, 320)}
 
-  <!-- Prometheus → Metrics -->
-{arrow("M 112,515 L 193,330", "arrow-red", "flow-left", "ah-red",
-       "scrape", 145, 410)}
+  <!-- Prometheus → Metrics (right then up) -->
+{arrow("M 112,520 L 155,520 L 155,330 L 193,330", "arrow-red", "flow-left", "ah-red",
+       "scrape", 155, 430)}
 
-  <!-- Security → Middleware -->
-{arrow("M 112,640 L 423,268", "arrow-red", "flow-right", "ah-red",
-       "allowlist", 250, 460)}
+  <!-- Security → Middleware (right then up) -->
+{arrow("M 112,650 L 155,650 L 155,268 L 423,268", "arrow-red", "flow-right", "ah-red",
+       "allowlist", 155, 460)}
 
-  <!-- DataPlane → Registry -->
+  <!-- DataPlane → Registry (horizontal) -->
 {arrow("M 587,185 L 653,185", "arrow-purple", "flow-right", "ah-purple",
        "resolve model", 620, 175)}
 
-  <!-- DataPlane → Response Cache -->
+  <!-- DataPlane → Response Cache (vertical) -->
 {arrow("M 505,212 L 505,298", "arrow-teal", "flow-down", "ah-teal",
        "cache lookup", 545, 260)}
 
-  <!-- DataPlane → Middleware -->
+  <!-- DataPlane → Middleware (vertical) -->
 {arrow("M 505,212 L 505,228", "arrow-green", "flow-down", "ah-green")}
 
-  <!-- Registry → Model Store -->
-{arrow("M 817,185 L 928,195", "arrow-orange", "flow-right", "ah-orange",
-       "load artifacts", 875, 180)}
+  <!-- Registry → Model Store (horizontal) -->
+{arrow("M 817,185 L 928,185", "arrow-orange", "flow-right", "ah-orange",
+       "load artifacts", 875, 175)}
 
-  <!-- Registry → Batcher -->
+  <!-- Registry → Batcher (vertical) -->
 {arrow("M 735,212 L 735,228", "arrow-purple", "flow-down", "ah-purple")}
 
-  <!-- Batcher → Codec Pipeline -->
+  <!-- Batcher → Codec Pipeline (vertical) -->
 {arrow("M 735,282 L 735,298", "arrow-purple", "flow-down", "ah-purple")}
 
-  <!-- Codec Pipeline → Workers -->
-{arrow("M 735,352 L 712,403", "arrow-red", "flow-down", "ah-red",
-       "dispatch", 700, 380)}
+  <!-- Codec Pipeline → Workers (down then left) -->
+{arrow("M 735,352 L 735,405 L 772,405", "arrow-red", "flow-down", "ah-red",
+       "dispatch", 750, 380)}
 
-  <!-- Workers → Queues -->
+  <!-- Workers → Queues (horizontal) -->
 {arrow("M 772,427 L 783,427", "arrow-red", "flow-right", "ah-red")}
 
-  <!-- KServe → Registry -->
-{arrow("M 928,345 L 817,200", "arrow-blue", "flow-left", "ah-blue",
-       "manage models", 900, 260)}
+  <!-- KServe → Registry (left then up) -->
+{arrow("M 928,345 L 860,345 L 860,200 L 817,200", "arrow-blue", "flow-left", "ah-blue",
+       "manage models", 860, 270)}
 
-  <!-- Workers → Runtimes (fan-out) -->
-{arrow("M 680,452 L 280,538", "arrow-cyan", "flow-down", "ah-cyan")}
-{arrow("M 695,452 L 415,538", "arrow-cyan", "flow-down", "ah-cyan")}
-{arrow("M 720,452 L 550,538", "arrow-cyan", "flow-down", "ah-cyan")}
-{arrow("M 740,452 L 685,538", "arrow-cyan", "flow-down", "ah-cyan")}
+  <!-- Workers → Runtimes (down then left/right) -->
+{arrow("M 680,452 L 680,490 L 280,490 L 280,538", "arrow-cyan", "flow-down", "ah-cyan")}
+{arrow("M 695,452 L 695,490 L 415,490 L 415,538", "arrow-cyan", "flow-down", "ah-cyan")}
+{arrow("M 720,452 L 720,490 L 550,490 L 550,538", "arrow-cyan", "flow-down", "ah-cyan")}
+{arrow("M 740,452 L 740,490 L 685,490 L 685,538", "arrow-cyan", "flow-down", "ah-cyan")}
 
   <!-- Response path: DataPlane → REST → Client -->
 {arrow("M 423,195 L 357,195", "arrow-green", "flow-left", "ah-green")}
-{arrow("M 193,195 L 112,205", "arrow-green", "flow-left", "ah-green")}
+{arrow("M 193,195 L 112,195", "arrow-green", "flow-left", "ah-green")}
 
   <!-- ═══ FOOTER ═══ -->
   <text x="575" y="750" fill="#888" font-size="10" text-anchor="middle">

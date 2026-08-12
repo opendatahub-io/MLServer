@@ -226,71 +226,71 @@
   <!--  ANIMATED FLOW ARROWS                                  -->
   <!-- ═══════════════════════════════════════════════════════ -->
 
-  <!-- Client → REST -->
-  <path d="M 112,195 L 193,180" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
-  <!-- Client → gRPC -->
-  <path d="M 112,210 L 193,250" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
+  <!-- Client → REST (right then up) -->
+  <path d="M 112,195 L 155,195 L 155,180 L 193,180" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
+  <!-- Client → gRPC (right then down) -->
+  <path d="M 112,210 L 155,210 L 155,250 L 193,250" class="flow-arrow flow-right arrow-blue" marker-end="url(#ah-blue)"/>
 
-  <!-- REST → DataPlane -->
+  <!-- REST → DataPlane (horizontal) -->
   <path d="M 357,185 L 423,185" class="flow-arrow flow-right arrow-green" marker-end="url(#ah-green)"/>
-  <!-- gRPC → DataPlane -->
-  <path d="M 357,250 L 423,190" class="flow-arrow flow-right arrow-green" marker-end="url(#ah-green)"/>
+  <!-- gRPC → DataPlane (right then up) -->
+  <path d="M 357,255 L 390,255 L 390,190 L 423,190" class="flow-arrow flow-right arrow-green" marker-end="url(#ah-green)"/>
 
-  <!-- Kafka → Kafka Consumer -->
-  <path d="M 112,375 L 193,395" class="flow-arrow flow-right arrow-purple" marker-end="url(#ah-purple)"/>
-  <!-- Kafka Consumer → Middleware -->
-  <path d="M 357,395 L 423,255" class="flow-arrow flow-right arrow-purple" marker-end="url(#ah-purple)"/>
-  <text x="390" y="310" class="arrow-label">CloudEvents</text>
+  <!-- Kafka → Kafka Consumer (horizontal) -->
+  <path d="M 112,380 L 193,380" class="flow-arrow flow-right arrow-purple" marker-end="url(#ah-purple)"/>
+  <!-- Kafka Consumer → Middleware (right then up) -->
+  <path d="M 357,395 L 390,395 L 390,255 L 423,255" class="flow-arrow flow-right arrow-purple" marker-end="url(#ah-purple)"/>
+  <text x="390" y="320" class="arrow-label">CloudEvents</text>
 
-  <!-- Prometheus → Metrics -->
-  <path d="M 112,515 L 193,330" class="flow-arrow flow-left arrow-red" marker-end="url(#ah-red)"/>
-  <text x="145" y="410" class="arrow-label">scrape</text>
+  <!-- Prometheus → Metrics (right then up) -->
+  <path d="M 112,520 L 155,520 L 155,330 L 193,330" class="flow-arrow flow-left arrow-red" marker-end="url(#ah-red)"/>
+  <text x="155" y="430" class="arrow-label">scrape</text>
 
-  <!-- Security → Middleware -->
-  <path d="M 112,640 L 423,268" class="flow-arrow flow-right arrow-red" marker-end="url(#ah-red)"/>
-  <text x="250" y="460" class="arrow-label">allowlist</text>
+  <!-- Security → Middleware (right then up) -->
+  <path d="M 112,650 L 155,650 L 155,268 L 423,268" class="flow-arrow flow-right arrow-red" marker-end="url(#ah-red)"/>
+  <text x="155" y="460" class="arrow-label">allowlist</text>
 
-  <!-- DataPlane → Registry -->
+  <!-- DataPlane → Registry (horizontal) -->
   <path d="M 587,185 L 653,185" class="flow-arrow flow-right arrow-purple" marker-end="url(#ah-purple)"/>
   <text x="620" y="175" class="arrow-label">resolve model</text>
 
-  <!-- DataPlane → Response Cache -->
+  <!-- DataPlane → Response Cache (vertical) -->
   <path d="M 505,212 L 505,298" class="flow-arrow flow-down arrow-teal" marker-end="url(#ah-teal)"/>
   <text x="545" y="260" class="arrow-label">cache lookup</text>
 
-  <!-- DataPlane → Middleware -->
+  <!-- DataPlane → Middleware (vertical) -->
   <path d="M 505,212 L 505,228" class="flow-arrow flow-down arrow-green" marker-end="url(#ah-green)"/>
 
-  <!-- Registry → Model Store -->
-  <path d="M 817,185 L 928,195" class="flow-arrow flow-right arrow-orange" marker-end="url(#ah-orange)"/>
-  <text x="875" y="180" class="arrow-label">load artifacts</text>
+  <!-- Registry → Model Store (horizontal) -->
+  <path d="M 817,185 L 928,185" class="flow-arrow flow-right arrow-orange" marker-end="url(#ah-orange)"/>
+  <text x="875" y="175" class="arrow-label">load artifacts</text>
 
-  <!-- Registry → Batcher -->
+  <!-- Registry → Batcher (vertical) -->
   <path d="M 735,212 L 735,228" class="flow-arrow flow-down arrow-purple" marker-end="url(#ah-purple)"/>
 
-  <!-- Batcher → Codec Pipeline -->
+  <!-- Batcher → Codec Pipeline (vertical) -->
   <path d="M 735,282 L 735,298" class="flow-arrow flow-down arrow-purple" marker-end="url(#ah-purple)"/>
 
-  <!-- Codec Pipeline → Workers -->
-  <path d="M 735,352 L 712,403" class="flow-arrow flow-down arrow-red" marker-end="url(#ah-red)"/>
-  <text x="700" y="380" class="arrow-label">dispatch</text>
+  <!-- Codec Pipeline → Workers (down then left) -->
+  <path d="M 735,352 L 735,405 L 772,405" class="flow-arrow flow-down arrow-red" marker-end="url(#ah-red)"/>
+  <text x="750" y="380" class="arrow-label">dispatch</text>
 
-  <!-- Workers → Queues -->
+  <!-- Workers → Queues (horizontal) -->
   <path d="M 772,427 L 783,427" class="flow-arrow flow-right arrow-red" marker-end="url(#ah-red)"/>
 
-  <!-- KServe → Registry -->
-  <path d="M 928,345 L 817,200" class="flow-arrow flow-left arrow-blue" marker-end="url(#ah-blue)"/>
-  <text x="900" y="260" class="arrow-label">manage models</text>
+  <!-- KServe → Registry (left then up) -->
+  <path d="M 928,345 L 860,345 L 860,200 L 817,200" class="flow-arrow flow-left arrow-blue" marker-end="url(#ah-blue)"/>
+  <text x="860" y="270" class="arrow-label">manage models</text>
 
-  <!-- Workers → Runtimes (fan-out) -->
-  <path d="M 680,452 L 280,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
-  <path d="M 695,452 L 415,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
-  <path d="M 720,452 L 550,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
-  <path d="M 740,452 L 685,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <!-- Workers → Runtimes (down then left/right) -->
+  <path d="M 680,452 L 680,490 L 280,490 L 280,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <path d="M 695,452 L 695,490 L 415,490 L 415,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <path d="M 720,452 L 720,490 L 550,490 L 550,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
+  <path d="M 740,452 L 740,490 L 685,490 L 685,538" class="flow-arrow flow-down arrow-cyan" marker-end="url(#ah-cyan)"/>
 
   <!-- Response path: DataPlane → REST → Client -->
   <path d="M 423,195 L 357,195" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
-  <path d="M 193,195 L 112,205" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
+  <path d="M 193,195 L 112,195" class="flow-arrow flow-left arrow-green" marker-end="url(#ah-green)"/>
 
   <!-- ═══ FOOTER ═══ -->
   <text x="575" y="750" fill="#888" font-size="10" text-anchor="middle">
