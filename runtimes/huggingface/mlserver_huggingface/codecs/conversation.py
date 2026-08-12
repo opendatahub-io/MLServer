@@ -16,12 +16,14 @@ class HuggingfaceConversationCodec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if payload is a list of Conversation objects."""
         return is_list_of(payload, Conversation)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: list[Conversation], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Encode a list of Conversations as a JSON BYTES ResponseOutput."""
         encoded = [json_encode(item, use_bytes=use_bytes) for item in payload]
         shape = [len(encoded), 1]
         return ResponseOutput(
@@ -36,6 +38,7 @@ class HuggingfaceConversationCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list[Any]:
+        """Decode a BYTES ResponseOutput into Conversation-like dicts."""
         packed = response_output.data
         return [json_decode(item) for item in packed]
 
@@ -43,6 +46,7 @@ class HuggingfaceConversationCodec(InputCodec):
     def encode_input(
         cls, name: str, payload: list[Conversation], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Encode a list of Conversations as a JSON BYTES RequestInput."""
         output = cls.encode_output(name, payload, use_bytes)
         return RequestInput(
             name=output.name,
@@ -56,5 +60,6 @@ class HuggingfaceConversationCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[Conversation]:
+        """Decode a BYTES RequestInput into Conversation objects."""
         packed = request_input.data
         return [json_decode(item) for item in packed]

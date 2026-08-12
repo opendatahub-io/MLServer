@@ -60,6 +60,7 @@ class AlibiDetectRuntime(MLModel):
     """
 
     def __init__(self, settings: ModelSettings):
+        """Initialise the runtime and parse alibi-detect-specific settings."""
         if settings.parameters is None:
             self._ad_settings = AlibiDetectSettings()
         else:
@@ -244,11 +245,13 @@ class AlibiDetectRuntime(MLModel):
 
     @cached_property
     def alibi_method(self) -> str:
+        """Return the detector method name derived from the model's module path."""
         module: str = type(self._model).__module__
         return module.split(".")[-1]
 
     @cached_property
     def alibi_type(self) -> str:
+        """Return the detector type (drift, outlier, adversarial) from the module path."""
         module: str = type(self._model).__module__
         method = module.split(".")[-2]
         if method in ALIBI_MODULE_NAMES:

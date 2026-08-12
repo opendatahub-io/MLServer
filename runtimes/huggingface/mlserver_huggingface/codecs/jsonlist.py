@@ -16,12 +16,14 @@ class HuggingfaceListJSONCodec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if payload is a list of dicts."""
         return is_list_of(payload, dict)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: list[dict[Any, Any]], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Encode a list of dicts as a BYTES ResponseOutput."""
         packed = map(partial(json_encode, use_bytes=use_bytes), payload)
         shape = [len(payload), 1]
         return ResponseOutput(
@@ -36,6 +38,7 @@ class HuggingfaceListJSONCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list[dict[Any, Any]]:
+        """Decode a BYTES ResponseOutput into a list of dicts."""
         packed = response_output.data
         return [json_decode(el) for el in packed]
 
@@ -43,6 +46,7 @@ class HuggingfaceListJSONCodec(InputCodec):
     def encode_input(
         cls, name: str, payload: list[dict[Any, Any]], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Encode a list of dicts as a BYTES RequestInput."""
         output = cls.encode_output(name, payload, use_bytes)
         return RequestInput(
             name=output.name,
@@ -56,5 +60,6 @@ class HuggingfaceListJSONCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[dict[Any, Any]]:
+        """Decode a BYTES RequestInput into a list of dicts."""
         packed = request_input.data
         return [json_decode(el) for el in packed]

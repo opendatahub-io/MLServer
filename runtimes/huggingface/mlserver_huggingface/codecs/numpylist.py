@@ -20,6 +20,7 @@ class NumpyListCodec(InputCodec):
 
     @classmethod
     def can_encode(csl, payload: Any) -> bool:
+        """Return True if payload is a list of same-shaped numpy arrays."""
         if not is_list_of(payload, np.ndarray):
             return False
         # only the support same shaped ndarray
@@ -29,6 +30,7 @@ class NumpyListCodec(InputCodec):
     def encode_output(
         cls, name: str, payload: list[np.ndarray], **kwargs
     ) -> ResponseOutput:
+        """Encode a list of numpy arrays into a single ResponseOutput tensor."""
         # NOTICE: composed np.array may cause loss of accuracy
         composed = np.array(payload)
         datatype = to_datatype(composed.dtype)
@@ -44,12 +46,14 @@ class NumpyListCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list[np.ndarray]:
+        """Decode a ResponseOutput tensor into a list of numpy arrays."""
         return cls.decode_input(response_output)  # type: ignore
 
     @classmethod
     def encode_input(
         cls, name: str, payload: list[np.ndarray], **kwargs
     ) -> RequestInput:
+        """Encode a list of numpy arrays into a single RequestInput tensor."""
         output = cls.encode_output(name=name, payload=payload)
 
         return RequestInput(
@@ -62,6 +66,7 @@ class NumpyListCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[np.ndarray]:
+        """Decode a RequestInput tensor into a list of numpy arrays."""
         model_data = _to_ndarray(request_input)
         reshaped = model_data.reshape(request_input.shape)
         return [el for el in reshaped]

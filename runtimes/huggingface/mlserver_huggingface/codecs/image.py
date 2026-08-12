@@ -34,12 +34,14 @@ class PILImageCodec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if payload is a list of PIL Images."""
         return is_list_of(payload, Image.Image)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: list[Image.Image], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Encode a list of PIL Images as base64 BYTES ResponseOutput."""
         packed = map(partial(_pil_base64encode, use_bytes=use_bytes), payload)
         shape = [len(payload), 1]
         return ResponseOutput(
@@ -54,6 +56,7 @@ class PILImageCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list["Image.Image"]:
+        """Decode base64 BYTES ResponseOutput into a list of PIL Images."""
         packed = response_output.data.root
         return list(map(_pil_base64decode, as_list(packed)))
 
@@ -61,6 +64,7 @@ class PILImageCodec(InputCodec):
     def encode_input(
         cls, name: str, payload: list[Image.Image], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Encode a list of PIL Images as base64 BYTES RequestInput."""
         output = cls.encode_output(name, payload, use_bytes)
         return RequestInput(
             name=output.name,
@@ -74,5 +78,6 @@ class PILImageCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list["Image.Image"]:
+        """Decode base64 BYTES RequestInput into a list of PIL Images."""
         packed = request_input.data.root
         return list(map(_pil_base64decode, as_list(packed)))

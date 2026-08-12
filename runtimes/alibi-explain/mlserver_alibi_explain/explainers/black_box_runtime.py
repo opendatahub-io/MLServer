@@ -23,6 +23,7 @@ class AlibiExplainBlackBoxRuntime(AlibiExplainRuntimeBase):
     """
 
     def __init__(self, settings: ModelSettings, explainer_class: type[Explainer]):
+        """Initialise with model settings and the alibi explainer class to use."""
         self._explainer_class = explainer_class
 
         # if we are here we are sure that settings.parameters is set,
@@ -41,6 +42,7 @@ class AlibiExplainBlackBoxRuntime(AlibiExplainRuntimeBase):
         super().__init__(settings, explainer_settings)
 
     async def load(self) -> bool:
+        """Initialise the black-box explainer with a remote prediction callback."""
         # TODO: use init explainer field instead?
         if self.alibi_explain_settings.init_parameters is not None:
             init_parameters = self.alibi_explain_settings.init_parameters

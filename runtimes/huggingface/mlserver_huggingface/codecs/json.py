@@ -14,12 +14,14 @@ class HuggingfaceSingleJSONCodec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if payload is a dict."""
         return isinstance(payload, dict)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: dict[Any, Any], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Encode a single dict as a JSON BYTES ResponseOutput."""
         encoded = json_encode(payload, use_bytes)
         return ResponseOutput(
             name=name,
@@ -33,6 +35,7 @@ class HuggingfaceSingleJSONCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> dict[Any, Any]:
+        """Decode a JSON BYTES ResponseOutput into a dict."""
         packed = response_output.data
         return json_decode(packed[0])
 
@@ -40,6 +43,7 @@ class HuggingfaceSingleJSONCodec(InputCodec):
     def encode_input(
         cls, name: str, payload: dict[Any, Any], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Encode a single dict as a JSON BYTES RequestInput."""
         output = cls.encode_output(name, payload, use_bytes)
         return RequestInput(
             name=output.name,
@@ -53,5 +57,6 @@ class HuggingfaceSingleJSONCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[bytes]:
+        """Decode a JSON BYTES RequestInput into a dict."""
         packed = request_input.data
         return json_decode(packed[0])

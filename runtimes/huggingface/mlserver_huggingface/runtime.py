@@ -30,6 +30,7 @@ class HuggingFaceRuntime(MLModel):
     """
 
     def __init__(self, settings: ModelSettings):
+        """Initialise the runtime and resolve HuggingFace-specific settings."""
         self.hf_settings = get_huggingface_settings(settings)
         super().__init__(settings)
 

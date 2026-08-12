@@ -12,7 +12,10 @@ DEFAULT_IMAGE_FORMAT = "PNG"
 
 
 class HuggingfaceJSONEncoder(JSONEncoderWithArray):
+    """JSON encoder with support for PIL Images and Conversation objects."""
+
     def default(self, obj):
+        """Serialise PIL Images as base64 data URIs and Conversations as dicts."""
         if isinstance(obj, Image.Image):
             buf = io.BytesIO()
             if not obj.format:
@@ -36,12 +39,14 @@ class HuggingfaceJSONEncoder(JSONEncoderWithArray):
 
 
 def json_encode(payload: Any, use_bytes: bool = False):
+    """Serialise payload to a JSON string, optionally as bytes."""
     if use_bytes:
         return json.dumps(payload, cls=HuggingfaceJSONEncoder).encode()
     return json.dumps(payload, cls=HuggingfaceJSONEncoder)
 
 
 def json_decode(payload):
+    """Deserialise a JSON string, restoring Conversation and Image objects."""
     raw_dict = json.loads(payload)
     return Convertor.do(raw_dict)
 
@@ -55,8 +60,11 @@ conversation_keys = {
 
 
 class Convertor:
+    """Recursively converts deserialised JSON back into domain objects."""
+
     @classmethod
     def do(cls, raw):
+        """Dispatch conversion based on the type of the raw value."""
         if isinstance(raw, dict):
             return cls.convert_dict(raw)
         elif isinstance(raw, list):
@@ -66,6 +74,7 @@ class Convertor:
 
     @classmethod
     def convert_conversation(cls, d: dict[str, Any]):
+        """Return a Conversation if the dict matches the expected keys, else None."""
         if set(d.keys()) == conversation_keys:
             return Conversation(
                 text=d["new_user_input"],
@@ -114,6 +123,8 @@ class Convertor:
 
 
 class EqualUtil:
+    """Deep-equality helpers for payloads containing Images, arrays, and nested structures."""
+
     @staticmethod
     def pil_equal(img1: "Image.Image", img2: "Image.Image") -> bool:
         diff = ImageChops.difference(img1, img2)

@@ -16,6 +16,7 @@ class AlibiExplainWhiteBoxRuntime(ABC, AlibiExplainRuntimeBase):
     """
 
     def __init__(self, settings: ModelSettings, explainer_class: type[Explainer]):
+        """Initialise with model settings and the alibi explainer class to use."""
         self._inference_model = None
         self._explainer_class = explainer_class
 
@@ -29,6 +30,7 @@ class AlibiExplainWhiteBoxRuntime(ABC, AlibiExplainRuntimeBase):
         super().__init__(settings, explainer_settings)
 
     async def load(self) -> bool:
+        """Load the inference model and initialise the white-box explainer."""
         # white box explainers requires access to the full inference model
         self._inference_model = await self._get_inference_model()
 

@@ -63,6 +63,7 @@ def _get_shape(input_spec: InputSpec) -> list[int]:
 def to_metadata_tensors(
     schema: Schema, prefix=DefaultInputPrefix
 ) -> list[MetadataTensor]:
+    """Convert an MLflow Schema into a list of V2 MetadataTensor descriptors."""
     metadata_tensors = []
 
     for idx, input_spec in enumerate(schema.inputs):
@@ -84,6 +85,7 @@ def to_metadata_tensors(
 
 
 def to_model_content_type(schema: Schema) -> str | None:
+    """Derive the top-level V2 content type from an MLflow model signature schema."""
     # This logic is based on MLflow's `mlflow.pyfunc._enforce_schema` method:
     # https://github.com/mlflow/mlflow/blob/ded7e447c20d259030260f1579693f9c5337a3ae/mlflow/pyfunc/__init__.py#L499
     if schema.is_tensor_spec():

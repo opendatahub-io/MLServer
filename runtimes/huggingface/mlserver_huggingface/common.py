@@ -24,6 +24,7 @@ _PipelineConstructor = Callable[..., Pipeline]
 def load_pipeline_from_settings(
     hf_settings: HuggingFaceSettings, settings: ModelSettings
 ) -> Pipeline:
+    """Build and return a Transformers (or Optimum) Pipeline from model settings."""
     pipeline = _get_pipeline_class(hf_settings)
     batch_size = 1
     if settings.max_batch_size:
@@ -84,7 +85,10 @@ def _get_pipeline_class(hf_settings: HuggingFaceSettings) -> _PipelineConstructo
 
 
 class NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that serialises numpy arrays as Python lists."""
+
     def default(self, obj):
+        """Convert numpy arrays to lists; delegate everything else to the parent."""
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)

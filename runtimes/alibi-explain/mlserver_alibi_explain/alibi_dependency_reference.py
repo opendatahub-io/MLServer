@@ -79,6 +79,8 @@ _TAG_TO_RT_IMPL: dict[str, ExplainerDependencyReference] = {
 
 
 class ExplainerEnum(str, Enum):
+    """Enumeration of supported alibi explainer types."""
+
     anchor_image = _ANCHOR_IMAGE_TAG
     anchor_text = _ANCHOR_TEXT_TAG
     anchor_tabular = _ANCHOR_TABULAR_TAG
@@ -90,12 +92,14 @@ class ExplainerEnum(str, Enum):
 
 
 def get_mlmodel_class_as_str(tag: ExplainerEnum | str) -> str:
+    """Return the fully-qualified MLServer runtime class path for an explainer tag."""
     if isinstance(tag, ExplainerEnum):
         tag = tag.value
     return _TAG_TO_RT_IMPL[tag].runtime_class
 
 
 def get_alibi_class_as_str(tag: ExplainerEnum | str) -> str:
+    """Return the fully-qualified alibi explainer class path for an explainer tag."""
     if isinstance(tag, ExplainerEnum):
         tag = tag.value
     return _TAG_TO_RT_IMPL[tag].alibi_class

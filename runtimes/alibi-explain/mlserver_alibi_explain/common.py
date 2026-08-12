@@ -51,6 +51,7 @@ def convert_from_bytes(output: ResponseOutput, ty: type | None = None) -> Any:
 def remote_predict(
     v2_payload: InferenceRequest, predictor_url: str, ssl_verify_path: str
 ) -> InferenceResponse:
+    """Send a V2 inference request to a remote predictor and return the response."""
     verify: str | bool = True
     if ssl_verify_path != "":
         verify = ssl_verify_path
@@ -101,6 +102,7 @@ class AlibiExplainSettings(BaseSettings):
 
 
 def import_and_get_class(class_path: str) -> type:
+    """Import a module and return the class specified by a dotted path."""
     last_dot = class_path.rfind(".")
     klass = getattr(import_module(class_path[:last_dot]), class_path[last_dot + 1 :])
     return klass

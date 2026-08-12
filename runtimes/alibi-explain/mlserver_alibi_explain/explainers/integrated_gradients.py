@@ -10,6 +10,8 @@ from mlserver_alibi_explain.explainers.white_box_runtime import (
 
 
 class IntegratedGradientsWrapper(AlibiExplainWhiteBoxRuntime):
+    """White-box runtime specialised for TensorFlow Integrated Gradients explanations."""
+
     def _explain_impl(self, input_data: Any, explain_parameters: dict) -> Explanation:
         # TODO: how are we going to deal with that?
         assert self._inference_model is not None, "Inference model is not set"

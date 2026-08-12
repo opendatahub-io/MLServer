@@ -53,6 +53,7 @@ class AlibiExplainRuntimeBase(MLModel):
     def __init__(
         self, settings: ModelSettings, explainer_settings: AlibiExplainSettings
     ):
+        """Initialise the base runtime with explainer settings and a thread pool."""
         self.alibi_explain_settings = explainer_settings
         self._executor = ThreadPoolExecutor()
         super().__init__(settings)
@@ -115,6 +116,7 @@ class AlibiExplainRuntimeBase(MLModel):
         )
 
     def get_alibi_method(self) -> str:
+        """Return the explainer method name derived from the model's module path."""
         module: str = type(self._model).__module__  # type: ignore
         return module.split(".")[-1]
 

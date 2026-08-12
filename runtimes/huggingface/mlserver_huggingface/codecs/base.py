@@ -31,6 +31,7 @@ from .raw import RawCodec
 
 
 def set_content_type(input_v: RequestInput, content_type: str):
+    """Set the content_type on a RequestInput's parameters if not already set."""
     if input_v.parameters is None:
         input_v.parameters = Parameters(content_type=content_type)
         return
@@ -129,6 +130,7 @@ class MultiInputRequestCodec(RequestCodec):
 
     @classmethod
     def decode_response(cls, response: InferenceResponse) -> list[Any] | dict[Any, Any]:
+        """Decode outputs, returning a list if keys are output_N, otherwise a dict."""
         data = {}
         is_list = True
         field_codecs = cls._find_decode_codecs(response)
@@ -149,6 +151,7 @@ class MultiInputRequestCodec(RequestCodec):
 
     @classmethod
     def encode_request(cls, payload: dict[str, Any], **kwargs) -> InferenceRequest:
+        """Encode a dict of named fields into a multi-input V2 InferenceRequest."""
         field_codecs = cls._find_encode_codecs(payload)
         inputs = []
         for key, value in payload.items():
@@ -169,6 +172,7 @@ class MultiInputRequestCodec(RequestCodec):
 
     @classmethod
     def decode_request(cls, request: InferenceRequest) -> dict[str, Any]:
+        """Decode a multi-input V2 InferenceRequest into a dict of named values."""
         values = {}
         field_codecs = cls._find_decode_codecs(request)
         for item in request.inputs:
@@ -185,6 +189,8 @@ class MultiInputRequestCodec(RequestCodec):
 
 @register_request_codec
 class HuggingfaceRequestCodec(MultiInputRequestCodec):
+    """Default HuggingFace request codec with prioritised input codec selection."""
+
     InputCodecsWithPriority = [
         PILImageCodec,
         HuggingfaceSingleJSONCodec,

@@ -111,6 +111,7 @@ class HuggingFaceSettings(BaseSettings):
 
     @property
     def task_name(self):
+        """Return the full task name, appending the suffix for translation tasks."""
         if self.task == "translation":
             return f"{self.task}{self.task_suffix}"
         return self.task

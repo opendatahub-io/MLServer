@@ -25,6 +25,7 @@ class TensorDictCodec(RequestCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if payload is a dict mapping names to numpy arrays."""
         if not isinstance(payload, dict):
             return False
 
@@ -38,6 +39,7 @@ class TensorDictCodec(RequestCodec):
         model_version: str | None = None,
         **kwargs,
     ) -> InferenceResponse:
+        """Encode a dict of named numpy arrays into a V2 InferenceResponse."""
         outputs = [
             NumpyCodec.encode_output(name, value, **kwargs)
             for name, value in payload.items()
@@ -52,6 +54,7 @@ class TensorDictCodec(RequestCodec):
 
     @classmethod
     def decode_response(cls, response: InferenceResponse) -> TensorDict:
+        """Decode a V2 InferenceResponse into a dict of named numpy arrays."""
         return {
             response_output.name: NumpyCodec.decode_output(response_output)
             for response_output in response.outputs
@@ -59,6 +62,7 @@ class TensorDictCodec(RequestCodec):
 
     @classmethod
     def encode_request(cls, payload: TensorDict, **kwargs) -> InferenceRequest:
+        """Encode a dict of named numpy arrays into a V2 InferenceRequest."""
         inputs = [
             NumpyCodec.encode_input(name, value, **kwargs)
             for name, value in payload.items()
@@ -70,6 +74,7 @@ class TensorDictCodec(RequestCodec):
 
     @classmethod
     def decode_request(cls, request: InferenceRequest) -> TensorDict:
+        """Decode a V2 InferenceRequest into a dict of named numpy arrays."""
         return {
             request_input.name: get_decoded_or_raw(request_input)
             for request_input in request.inputs

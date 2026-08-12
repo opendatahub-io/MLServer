@@ -34,6 +34,7 @@ MODEL_DICT = {
 
 
 async def get_mllib_load(settings: ModelSettings):
+    """Return the PySpark MLlib model loader function matching the configured format."""
     if not settings.parameters:
         raise InvalidMLlibFormat(settings.name)
 

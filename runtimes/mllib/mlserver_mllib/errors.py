@@ -2,6 +2,8 @@ from mlserver.errors import MLServerError
 
 
 class InvalidMLlibFormat(MLServerError):
+    """Raised when the model's MLlib format is missing or not recognised."""
+
     def __init__(self, name: str, model_uri: str | None = None):
         msg = f"Invalid MLlib format for model {name}"
         if model_uri:
