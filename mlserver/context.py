@@ -9,6 +9,8 @@ model_version_var: ContextVar[str] = ContextVar("model_version")
 
 @contextmanager
 def model_context(model_settings: ModelSettings):
+    """Context manager that sets ``model_name`` and ``model_version`` context
+    vars for the duration of a block, used by logging and metrics."""
     model_name_token = model_name_var.set(model_settings.name)
 
     model_version = ""

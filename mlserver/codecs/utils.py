@@ -70,6 +70,7 @@ def encode_response_output(
     request_output: RequestOutput,
     metadata_outputs: dict[str, MetadataTensor] = {},
 ) -> ResponseOutput | None:
+    """Encode a payload into a ResponseOutput using the codec from content_type or auto-detection."""
     output_metadata = metadata_outputs.get(request_output.name)
     content_type = _get_content_type(request_output, output_metadata)
     codec = (
@@ -91,6 +92,7 @@ def encode_inference_response(
     payload: Any,
     model_settings: ModelSettings,
 ) -> InferenceResponse | None:
+    """Encode a payload into a full InferenceResponse, auto-detecting the codec."""
     # TODO: Allow users to override codec through model's metadata
     codec = find_request_codec_by_payload(payload)
 
@@ -108,6 +110,7 @@ def decode_request_input(
     request_input: RequestInput,
     metadata_inputs: dict[str, MetadataTensor] = {},
 ) -> Any | None:
+    """Decode a single RequestInput using its content_type codec, caching the result."""
     input_metadata = metadata_inputs.get(request_input.name)
     content_type = _get_content_type(request_input, input_metadata)
     if content_type is None:
@@ -127,6 +130,7 @@ def decode_inference_request(
     model_settings: ModelSettings | None = None,
     metadata_inputs: dict[str, MetadataTensor] = {},
 ) -> Any | None:
+    """Decode all inputs in a request and optionally the entire request via a request-level codec."""
     for request_input in inference_request.inputs:
         decode_request_input(request_input, metadata_inputs)
 
@@ -142,6 +146,7 @@ def decode_inference_request(
 
 
 def has_decoded(parametrised_obj: Parametrised) -> bool:
+    """Return True if a decoded payload has been cached on the object's parameters."""
     if parametrised_obj.parameters:
         return hasattr(parametrised_obj.parameters, DecodedParameterName)
 
@@ -149,11 +154,13 @@ def has_decoded(parametrised_obj: Parametrised) -> bool:
 
 
 def get_decoded(parametrised_obj: Parametrised) -> Any:
+    """Return the cached decoded payload, or None if not yet decoded."""
     if has_decoded(parametrised_obj):
         return getattr(parametrised_obj.parameters, DecodedParameterName)
 
 
 def get_decoded_or_raw(parametrised_obj: Parametrised) -> Any:
+    """Return the decoded payload if available, otherwise the raw data or full object."""
     if not has_decoded(parametrised_obj):
         if isinstance(parametrised_obj, RequestInput):
             # If this is a RequestInput, return its data
@@ -180,6 +187,7 @@ class SingleInputRequestCodec(RequestCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Delegate encoding capability check to the underlying InputCodec."""
         if cls.InputCodec is None:
             return False
 
@@ -193,6 +201,7 @@ class SingleInputRequestCodec(RequestCodec):
         model_version: str | None = None,
         **kwargs,
     ) -> InferenceResponse:
+        """Wrap a single output tensor into a full InferenceResponse."""
         if cls.InputCodec is None:
             raise NotImplementedError(
                 f"No input codec found for {type(cls)} request codec"
@@ -210,6 +219,7 @@ class SingleInputRequestCodec(RequestCodec):
 
     @classmethod
     def decode_response(cls, response: InferenceResponse) -> Any:
+        """Decode a single-output response back to a native payload."""
         if len(response.outputs) != 1:
             raise CodecError(
                 f"The '{cls.ContentType}' codec only supports a single output tensor "
@@ -225,6 +235,7 @@ class SingleInputRequestCodec(RequestCodec):
 
     @classmethod
     def encode_request(cls, payload: Any, **kwargs) -> InferenceRequest:
+        """Wrap a single input tensor into a full InferenceRequest."""
         if cls.InputCodec is None:
             raise NotImplementedError(
                 f"No input codec found for {type(cls)} request codec"
@@ -237,6 +248,7 @@ class SingleInputRequestCodec(RequestCodec):
 
     @classmethod
     def decode_request(cls, request: InferenceRequest) -> Any:
+        """Decode a single-input request back to a native payload."""
         if len(request.inputs) != 1:
             raise CodecError(
                 f"The '{cls.ContentType}' codec only supports a single input tensor "

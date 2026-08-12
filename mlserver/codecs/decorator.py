@@ -26,6 +26,7 @@ PredictFunc = Callable[
 
 
 def _as_list(a: Any | tuple[Any] | None) -> list[Any]:
+    """Normalise a value, tuple, or None into a flat list."""
     if a is None:
         return []
 
@@ -42,6 +43,7 @@ def _as_list(a: Any | tuple[Any] | None) -> list[Any]:
 
 
 def _is_codec_type(c: Codec, t: type) -> bool:
+    """Return True if codec *c* is a subclass or instance of type *t*."""
     if issubclass(c, t):  # type: ignore
         return True
 
@@ -56,6 +58,7 @@ _is_request_codec = partial(_is_codec_type, t=RequestCodec)
 
 
 def _is_optional(t: type[Any]) -> bool:
+    """Return True if *t* is ``Optional[X]`` (i.e. ``X | None``)."""
     origin = get_origin(t)
     if origin in (Union, types.UnionType):
         args = get_args(t)
@@ -66,6 +69,7 @@ def _is_optional(t: type[Any]) -> bool:
 
 
 def _unwrap_optional(t: type[Any]) -> type[Any]:
+    """Extract the non-None type from an Optional type hint."""
     args = get_args(t)
     for arg in args:
         if not isinstance(arg, type(None)):
@@ -81,10 +85,12 @@ class SignatureCodec(RequestCodec):
 
     # TODO: Should this receive the whole class as argument?
     def __init__(self, predict: Callable):
+        """Build input/output codec mappings from *predict*'s type hints."""
         self._predict = predict
         self._input_codecs, self._output_codecs = self._get_codecs(predict)
 
     def _get_codecs(self, pred: Callable) -> tuple[dict[str, Codec], list[Codec]]:
+        """Resolve type hints to input and output codecs."""
         self._input_hints = self._get_type_hints(pred)
         self._output_hints = _as_list(self._input_hints.pop("return", None))
 
@@ -103,6 +109,7 @@ class SignatureCodec(RequestCodec):
         return input_codecs, output_codecs
 
     def _get_type_hints(self, pred: Callable) -> dict[str, type[Any]]:
+        """Return type hints for *pred*, unwrapping Optional where present."""
         type_hints = get_type_hints(pred)
         # For us, `typing.Optional` is just syntactic sugar, so let's ensure we
         # unwrap it
@@ -115,6 +122,7 @@ class SignatureCodec(RequestCodec):
     def _find_codec(
         self, name: str | None, type_hint: type[Any], is_input: bool = False
     ) -> Codec:
+        """Find a matching InputCodec or RequestCodec for the given type hint."""
         codec = find_input_codec(type_hint=type_hint)
         if codec is not None:
             return codec
@@ -128,6 +136,7 @@ class SignatureCodec(RequestCodec):
     def decode_request(  # type: ignore
         self, request: InferenceRequest
     ) -> dict[str, Any]:
+        """Decode an InferenceRequest into keyword arguments for the predict method."""
         inputs = {}
         extra_request_inputs = []
         for request_input in request.inputs:
@@ -160,6 +169,7 @@ class SignatureCodec(RequestCodec):
         return inputs
 
     def _get_request_codec(self) -> tuple[str, RequestCodec] | None:
+        """Return the first (name, RequestCodec) pair, or None if absent."""
         for name, codec in self._input_codecs.items():
             if _is_request_codec(codec):
                 return name, codec  # type: ignore
@@ -169,6 +179,7 @@ class SignatureCodec(RequestCodec):
     def encode_response(  # type: ignore
         self, model_name: str, payload: Any, model_version: str | None = None
     ) -> InferenceResponse:
+        """Encode predict return values into an InferenceResponse."""
         payloads = _as_list(payload)
         outputs = []
         for idx, payload in enumerate(payloads):
@@ -179,6 +190,7 @@ class SignatureCodec(RequestCodec):
         )
 
     def _encode_outputs(self, idx: int, payload: Any) -> list[ResponseOutput]:
+        """Encode a single output payload using the codec at position *idx*."""
         output_type = type(payload)
         if idx >= len(self._output_codecs):
             raise OutputNotFound(idx, output_type, self._output_hints)
@@ -207,6 +219,8 @@ class SignatureCodec(RequestCodec):
 
 
 def decode_args(predict: Callable) -> PredictFunc:
+    """Decorator that auto-decodes request inputs and encodes outputs
+    based on the type hints of the wrapped *predict* function."""
     codec = SignatureCodec(predict)
 
     @wraps(predict)

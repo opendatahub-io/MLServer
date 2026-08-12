@@ -49,6 +49,7 @@ class MLModel:
     """
 
     def __init__(self, settings: ModelSettings):
+        """Initialise the model with its settings and build metadata indexes."""
         self._settings = settings
         self._inputs_index: dict[str, MetadataTensor] = {}
 
@@ -158,6 +159,7 @@ class MLModel:
 
     @inputs.setter
     def inputs(self, value: list[MetadataTensor]):
+        """Set model inputs and rebuild the inputs metadata index."""
         self._settings.inputs = value
         self._inputs_index = _generate_metadata_index(self._settings.inputs)
 
@@ -173,6 +175,7 @@ class MLModel:
 
     @outputs.setter
     def outputs(self, value: list[MetadataTensor]):
+        """Set model outputs and rebuild the outputs metadata index."""
         self._settings.outputs = value
         self._outputs_index = _generate_metadata_index(self._settings.outputs)
 
@@ -276,6 +279,7 @@ class MLModel:
         raise CodecNotFound(name=request_output.name, is_input=False, is_request=False)
 
     async def metadata(self) -> MetadataModelResponse:
+        """Return model metadata including name, platform, and tensor specs."""
         model_metadata = MetadataModelResponse(
             name=self.name,
             platform=self._settings.platform,

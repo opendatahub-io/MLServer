@@ -106,6 +106,7 @@ class PandasCodec(RequestCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if the payload is a Pandas DataFrame."""
         return isinstance(payload, pd.DataFrame)
 
     @classmethod
@@ -117,6 +118,7 @@ class PandasCodec(RequestCodec):
         use_bytes: bool = True,
         **kwargs,
     ) -> InferenceResponse:
+        """Encode a DataFrame into an InferenceResponse with one output per column."""
         outputs = cls.encode_outputs(payload, use_bytes=use_bytes)
 
         return InferenceResponse(
@@ -128,6 +130,7 @@ class PandasCodec(RequestCodec):
 
     @classmethod
     def decode_response(cls, response: InferenceResponse) -> pd.DataFrame:
+        """Decode an InferenceResponse into a DataFrame with one column per output."""
         data = {
             response_output.name: _to_series(response_output)
             for response_output in response.outputs
@@ -139,6 +142,7 @@ class PandasCodec(RequestCodec):
     def encode_outputs(
         cls, payload: pd.DataFrame, use_bytes: bool = True
     ) -> list[ResponseOutput]:
+        """Convert each DataFrame column into a ResponseOutput."""
         return [
             _to_response_output(payload[col], use_bytes=use_bytes) for col in payload
         ]
@@ -147,6 +151,7 @@ class PandasCodec(RequestCodec):
     def encode_request(
         cls, payload: pd.DataFrame, use_bytes: bool = True, **kwargs
     ) -> InferenceRequest:
+        """Encode a DataFrame into an InferenceRequest with one input per column."""
         outputs = cls.encode_outputs(payload, use_bytes=use_bytes)
 
         return InferenceRequest(
@@ -165,6 +170,7 @@ class PandasCodec(RequestCodec):
 
     @classmethod
     def decode_request(cls, request: InferenceRequest) -> pd.DataFrame:
+        """Decode an InferenceRequest into a DataFrame with one column per input."""
         data = {
             request_input.name: _to_series(request_input)
             for request_input in request.inputs

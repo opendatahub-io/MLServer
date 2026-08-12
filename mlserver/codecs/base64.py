@@ -50,12 +50,14 @@ class Base64Codec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if every element in ``payload`` is bytes."""
         return is_list_of(payload, bytes)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: list[bytes], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Base64-encode raw bytes into a ResponseOutput."""
         # Assume that payload is already in b64, so we only need to pack it
         packed = map(partial(_encode_base64, use_bytes=use_bytes), payload)
         shape = [len(payload), 1]
@@ -69,6 +71,7 @@ class Base64Codec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list[bytes]:
+        """Decode base64 BYTES data from a ResponseOutput into raw bytes."""
         packed = response_output.data.root
 
         return list(map(_decode_base64, as_list(packed)))
@@ -77,6 +80,7 @@ class Base64Codec(InputCodec):
     def encode_input(
         cls, name: str, payload: list[bytes], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Base64-encode raw bytes into a RequestInput."""
         # Assume that payload is already in b64, so we only need to pack it
         output = cls.encode_output(name, payload, use_bytes)
         return RequestInput(
@@ -89,6 +93,7 @@ class Base64Codec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[bytes]:
+        """Decode base64 BYTES data from a RequestInput into raw bytes."""
         packed = request_input.data.root
 
         return list(map(_decode_base64, as_list(packed)))

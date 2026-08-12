@@ -17,6 +17,7 @@ class RuntimePathValidationError(ValueError):
 
     @property
     def cli_suggestion(self) -> str:
+        """Return an actionable hint for the user, or empty string if none."""
         return ""
 
     def cli_message(self) -> str:
@@ -31,6 +32,7 @@ class MissingRuntimeSourcePathsError(RuntimePathValidationError):
     """Raised when required runtime modules have no matching source paths."""
 
     def __init__(self, modules: set[str]):
+        """Initialise with the set of module names lacking source paths."""
         self.modules = modules
         super().__init__(
             "Missing runtime source paths for custom allowlisted runtime module(s): "
@@ -39,6 +41,7 @@ class MissingRuntimeSourcePathsError(RuntimePathValidationError):
 
     @property
     def cli_suggestion(self) -> str:
+        """Suggest adding ``--runtime-path`` flags."""
         return "Pass one or more --runtime-path values pointing to those modules."
 
 
@@ -46,6 +49,7 @@ class UndeclaredRuntimeSourcePathsError(RuntimePathValidationError):
     """Raised when discovered runtime modules are not allowlisted."""
 
     def __init__(self, modules: set[str]):
+        """Initialise with the set of undeclared module names."""
         self.modules = modules
         super().__init__(
             "Runtime source paths include undeclared runtime module(s): "
@@ -54,6 +58,7 @@ class UndeclaredRuntimeSourcePathsError(RuntimePathValidationError):
 
     @property
     def cli_suggestion(self) -> str:
+        """Suggest adding ``--allow-runtime`` flags."""
         return "Declare matching `--allow-runtime module.ClassName` values."
 
 
@@ -61,6 +66,7 @@ class MissingNestedRuntimePackagesError(RuntimePathValidationError):
     """Raised when nested runtimes are missing package-directory sources."""
 
     def __init__(self, packages: set[str]):
+        """Initialise with the set of missing top-level package names."""
         self.packages = packages
         super().__init__(
             "Nested allowlisted runtime module(s) require package-directory "
@@ -70,6 +76,7 @@ class MissingNestedRuntimePackagesError(RuntimePathValidationError):
 
     @property
     def cli_suggestion(self) -> str:
+        """Suggest using package-directory ``--runtime-path`` flags."""
         return "Use `--runtime-path <module>/` for those top-level modules."
 
 
@@ -77,10 +84,12 @@ class RuntimePathsRequireAllowlistError(RuntimePathValidationError):
     """Raised when runtime paths are provided without custom allowlisted runtimes."""
 
     def __init__(self, message: str):
+        """Initialise with a descriptive error message."""
         super().__init__(message)
 
     @property
     def cli_suggestion(self) -> str:
+        """Suggest adding ``--allow-runtime`` flags."""
         return "Declare matching `--allow-runtime module.ClassName` values."
 
 

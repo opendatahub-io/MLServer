@@ -85,6 +85,10 @@ class SingleModelRegistry:
         on_model_unload: list[ModelRegistryHook] = [],
         model_initialiser: ModelInitialiser = model_initialiser,
     ):
+        """Create a registry for versions of a single named model.
+
+        Lifecycle hooks are called during load, reload, and unload operations.
+        """
         self._versions: dict[str, MLModel] = {}
         self._default: MLModel | None = None
 
@@ -96,6 +100,7 @@ class SingleModelRegistry:
 
     @property
     def default(self) -> MLModel | None:
+        """The latest (default) model version, resolved lazily."""
         if self._default is None:
             self._default = self._find_default()
 
@@ -228,6 +233,7 @@ class SingleModelRegistry:
         logger.info(f"Reloaded model '{new_model.name}' successfully.")
 
     async def unload(self):
+        """Unload all versions of this model."""
         models = await self.get_models()
         await asyncio.gather(*[self._unload_model(model) for model in models])
 
@@ -237,6 +243,7 @@ class SingleModelRegistry:
         logger.info(f"Unloaded all versions of model '{self._name}' successfully.")
 
     async def unload_version(self, version: str | None = None):
+        """Unload a specific version, or the default if *version* is ``None``."""
         model = await self.get_model(version)
         await self._unload_model(model)
 
@@ -277,6 +284,8 @@ class SingleModelRegistry:
         return self.default
 
     async def get_model(self, version: str | None = None) -> MLModel:
+        """Return the model for *version*, or the default. Raises
+        :class:`ModelNotFound` if no match exists."""
         model = self._find_model(version)
 
         if model is None:
@@ -285,6 +294,7 @@ class SingleModelRegistry:
         return model
 
     async def get_models(self) -> list[MLModel]:
+        """Return all loaded versions, including an unversioned default."""
         # NOTE: `.values()` returns a "view" instead of a list
         models = list(self._versions.values())
 
@@ -296,12 +306,14 @@ class SingleModelRegistry:
         return models
 
     def _register(self, model: MLModel):
+        """Store a model by version and refresh the default pointer."""
         if model.version:
             self._versions[model.version] = model
 
         self._refresh_default(model)
 
     def empty(self) -> bool:
+        """Return ``True`` if no versions are registered and no default exists."""
         if self._versions:
             return False
 
@@ -320,6 +332,10 @@ class MultiModelRegistry:
         on_model_unload: list[ModelRegistryHook] = [],
         model_initialiser: ModelInitialiser = model_initialiser,
     ):
+        """Create a multi-model registry with lifecycle hooks.
+
+        Each distinct model name gets its own :class:`SingleModelRegistry`.
+        """
         self._models: dict[str, SingleModelRegistry] = {}
         self._on_model_load = on_model_load
         self._on_model_reload = on_model_reload
@@ -378,10 +394,12 @@ class MultiModelRegistry:
             del self._models[name]
 
     async def get_model(self, name: str, version: str | None = None) -> MLModel:
+        """Look up a model by name and optional version."""
         model_registry = self._get_model_registry(name, version)
         return await model_registry.get_model(version)
 
     async def get_models(self, name: str | None = None) -> list[MLModel]:
+        """Return models for *name*, or all loaded models if *name* is ``None``."""
         if name is not None:
             model_registry = self._get_model_registry(name)
             return await model_registry.get_models()

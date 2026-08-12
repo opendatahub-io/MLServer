@@ -10,10 +10,12 @@ _DefaultStrCodec = "utf-8"
 
 
 def encode_str(elem: str) -> bytes:
+    """Encode a string to UTF-8 bytes."""
     return elem.encode(_DefaultStrCodec)
 
 
 def decode_str(encoded: ListElement, str_codec=_DefaultStrCodec) -> str:
+    """Decode bytes (or pass through strings) to a Python str."""
     if encoded is None:
         return None
 
@@ -45,12 +47,14 @@ class StringCodec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if the payload is a list of strings."""
         return is_list_of(payload, str)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: list[str], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Encode a list of strings as a BYTES ResponseOutput, optionally as raw bytes."""
         packed = payload
         if use_bytes:
             packed = list(map(encode_str, payload))  # type: ignore
@@ -66,16 +70,19 @@ class StringCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list[str]:
+        """Decode a BYTES ResponseOutput back into a list of strings."""
         return _decode_input_or_output(response_output)
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[str]:
+        """Decode a BYTES RequestInput back into a list of strings."""
         return _decode_input_or_output(request_input)
 
     @classmethod
     def encode_input(
         cls, name: str, payload: list[str], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Encode a list of strings as a BYTES RequestInput."""
         output = cls.encode_output(name, payload, use_bytes)
 
         return RequestInput(

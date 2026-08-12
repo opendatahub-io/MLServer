@@ -5,6 +5,8 @@ from ..errors import MLServerError
 
 
 class CodecNotFound(MLServerError):
+    """Raised when no codec matches the requested name, type, or payload direction."""
+
     def __init__(
         self,
         name: str | None = None,
@@ -12,6 +14,7 @@ class CodecNotFound(MLServerError):
         is_input: bool = False,
         is_request: bool = False,
     ):
+        """Build an error message from the codec name, payload type, and direction."""
         msg = ""
         if name:
             msg = f"with name '{name}'"
@@ -38,15 +41,21 @@ class CodecNotFound(MLServerError):
 
 
 class CodecError(MLServerError):
+    """Raised when encoding or decoding a payload fails."""
+
     def __init__(self, msg: str):
+        """Wrap *msg* with a codec-specific error prefix."""
         msg = f"There was an error encoding / decoding the payload: {msg}"
         super().__init__(msg)
 
 
 class OutputNotFound(MLServerError):
+    """Raised when an output value's type does not match any expected output hint."""
+
     def __init__(
         self, output_idx: int, output_type: type[Any], output_hints: list[type[Any]]
     ):
+        """Build an error listing the mismatched output position and expected types."""
         expected_outputs = [f"'{output_hint}'" for output_hint in output_hints]
         msg = (
             f"Unexpected output value at position '{output_idx}' ({output_type}). "
@@ -56,7 +65,10 @@ class OutputNotFound(MLServerError):
 
 
 class InputsNotFound(MLServerError):
+    """Raised when request inputs do not match any of the expected input names."""
+
     def __init__(self, inputs: list[RequestInput], input_hints: dict[str, Any]):
+        """Build an error listing the unrecognised input names and available ones."""
         input_names = [f"'{inp.name}'" for inp in inputs]
         available_inputs = [f"'{input_name}'" for input_name in input_hints.keys()]
         msg = (

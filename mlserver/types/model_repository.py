@@ -9,10 +9,14 @@ from .base import BaseModel
 
 
 class RepositoryIndexRequest(BaseModel):
+    """Request to list models in the repository, optionally filtered by readiness."""
+
     ready: bool | None = None
 
 
 class State(Enum):
+    """Lifecycle state of a model in the repository."""
+
     UNKNOWN = "UNKNOWN"
     READY = "READY"
     UNAVAILABLE = "UNAVAILABLE"
@@ -21,6 +25,8 @@ class State(Enum):
 
 
 class RepositoryIndexResponseItem(BaseModel):
+    """Status of a single model in the repository index."""
+
     name: str
     version: str | None = None
     state: State
@@ -28,6 +34,8 @@ class RepositoryIndexResponseItem(BaseModel):
 
 
 class RepositoryIndexResponse(RootModel[list[RepositoryIndexResponseItem]]):
+    """List of all models in the repository, supporting list-like access."""
+
     root: list[RepositoryIndexResponseItem] = Field(
         ..., title="RepositoryIndexResponse"
     )
@@ -43,8 +51,12 @@ class RepositoryIndexResponse(RootModel[list[RepositoryIndexResponseItem]]):
 
 
 class RepositoryLoadErrorResponse(BaseModel):
+    """Error response returned when a model load request fails."""
+
     error: str | None = None
 
 
 class RepositoryUnloadErrorResponse(BaseModel):
+    """Error response returned when a model unload request fails."""
+
     error: str | None = None

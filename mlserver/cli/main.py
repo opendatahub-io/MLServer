@@ -24,6 +24,9 @@ from ..settings import ALLOWED_MODEL_IMPLEMENTATIONS, canonicalize_runtime_impor
 
 
 def click_async(f):
+    """Decorator that wraps an async function so Click can invoke it
+    synchronously via ``asyncio.run``."""
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         return asyncio.run(f(*args, **kwargs))
@@ -417,6 +420,8 @@ async def infer(
 
 
 def main():
+    """Entry point for the ``mlserver`` CLI: configure logging, install
+    uvloop if available, and dispatch to the Click command group."""
     configure_logger()
     install_uvloop_event_loop()
     root()

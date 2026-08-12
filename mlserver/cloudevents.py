@@ -18,11 +18,17 @@ CLOUDEVENTS_HEADER_ENDPOINT = "Ce-Endpoint"
 
 
 class CloudEventsTypes(Enum):
+    """CloudEvents ``type`` values for inference request and response events."""
+
     Request = "io.seldon.serving.inference.request"
     Response = "io.seldon.serving.inference.response"
 
 
 def get_namespace() -> str | None:
+    """Read the Kubernetes namespace from the service-account volume mount.
+
+    Returns ``None`` when running outside a Kubernetes pod.
+    """
     try:
         # Namespace can be fetched from loaded file vars from k8s 1.15.3+
         with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
@@ -46,6 +52,8 @@ def _update_headers(
 
 
 class CloudEventsMiddleware(InferenceMiddleware):
+    """Middleware that injects CloudEvents headers into inference payloads."""
+
     def __init__(self, settings: Settings):
         self._settings = settings
         self._namespace = get_namespace()
@@ -83,6 +91,7 @@ class CloudEventsMiddleware(InferenceMiddleware):
         request: InferenceRequest,
         model_settings: ModelSettings,
     ) -> InferenceRequest:
+        """Add CloudEvents headers to an incoming inference request."""
         ce_headers = self._get_headers(
             CloudEventsTypes.Request, model_settings, request.id
         )
@@ -95,6 +104,7 @@ class CloudEventsMiddleware(InferenceMiddleware):
         response: InferenceResponse,
         model_settings: ModelSettings,
     ) -> InferenceResponse:
+        """Add CloudEvents headers to an outgoing inference response."""
         ce_headers = self._get_headers(
             CloudEventsTypes.Response, model_settings, response.id
         )

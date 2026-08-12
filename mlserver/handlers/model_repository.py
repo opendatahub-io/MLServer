@@ -13,11 +13,15 @@ NO_VERSION_KEY = "__no_version__"
 
 
 class ModelRepositoryHandlers:
+    """Handlers for model repository operations (index, load, unload)."""
+
     def __init__(self, repository: ModelRepository, model_registry: MultiModelRegistry):
+        """Initialise with a model repository and the active model registry."""
         self._repository = repository
         self._model_registry = model_registry
 
     async def index(self, payload: RepositoryIndexRequest) -> RepositoryIndexResponse:
+        """List all models in the repository, optionally filtered by readiness."""
         all_model_settings = await self._repository.list()
 
         repository_items = []
@@ -60,6 +64,7 @@ class ModelRepositoryHandlers:
         return State.UNKNOWN
 
     async def load(self, name: str) -> bool:
+        """Load (or reload) all versions of a model, removing stale versions."""
         all_model_settings = await self._repository.find(name)
 
         loaded_versions = set()
@@ -80,6 +85,7 @@ class ModelRepositoryHandlers:
         return True
 
     async def unload(self, name: str) -> bool:
+        """Unload all versions of a model from the registry."""
         await self._model_registry.unload(name)
 
         return True

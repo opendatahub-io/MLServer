@@ -5,6 +5,7 @@ from ..logging import logger
 
 
 def load_model_settings(model_settings_path: str) -> ModelSettings:
+    """Load and validate ModelSettings from a JSON file, applying folder-name defaults."""
     model_settings = ModelSettings.parse_file(model_settings_path)
 
     # If name not present, default to folder name
@@ -32,6 +33,7 @@ def load_model_settings(model_settings_path: str) -> ModelSettings:
 
 
 def _folder_matches(folder_name: str, model_settings: ModelSettings) -> bool:
+    """Return True if the model name or version matches the folder name."""
     if model_settings.name == folder_name:
         return True
 

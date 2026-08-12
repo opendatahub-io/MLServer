@@ -11,11 +11,15 @@ _HandlerMethod = Callable[..., Any]
 
 
 class CustomHandler(BaseModel):
+    """Metadata for a user-defined REST endpoint on an MLModel."""
+
     rest_path: str
     rest_method: str = "POST"
 
 
 def custom_handler(rest_path: str, rest_method: str = "POST"):
+    """Decorator that registers an MLModel method as a custom REST endpoint."""
+
     def _wraps(f):
         handler = CustomHandler(rest_path=rest_path, rest_method=rest_method)
         register_custom_handler(handler, f)
@@ -25,10 +29,12 @@ def custom_handler(rest_path: str, rest_method: str = "POST"):
 
 
 def register_custom_handler(handler: CustomHandler, method: _HandlerMethod):
+    """Attach ``CustomHandler`` metadata to a method for later discovery."""
     setattr(method, _CustomHandlerAttr, handler)
 
 
 def get_custom_handlers(model: MLModel) -> list[tuple[CustomHandler, _HandlerMethod]]:
+    """Discover all methods on ``model`` decorated with ``@custom_handler``."""
     handlers = []
     members = inspect.getmembers(model)
 

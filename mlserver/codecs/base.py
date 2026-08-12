@@ -8,6 +8,8 @@ from ..logging import logger
 
 
 def deprecated(reason: str):
+    """Decorator that logs a deprecation warning before calling the wrapped function."""
+
     def _deprecated(func):
         @functools.wraps(func)
         def _inner(*args, **kwargs):
@@ -42,6 +44,10 @@ class InputCodec:
     @classmethod
     @deprecated("The encode() method is now deprecated. Use encode_output() instead.")
     def encode(cls, name: str, payload: Any) -> ResponseOutput:
+        """Encode payload into a response output.
+
+        .. deprecated:: Use :meth:`encode_output` instead.
+        """
         return cls.encode_output(name, payload)
 
     @classmethod
@@ -68,6 +74,10 @@ class InputCodec:
     @classmethod
     @deprecated("The decode() method is now deprecated. Use decode_input() instead.")
     def decode(cls, request_input: RequestInput) -> Any:
+        """Decode a request input into a high-level Python type.
+
+        .. deprecated:: Use :meth:`decode_input` instead.
+        """
         return cls.decode_input(request_input)
 
     @classmethod
@@ -105,6 +115,10 @@ class RequestCodec:
     def encode(
         cls, model_name: str, payload: Any, model_version: str | None = None
     ) -> InferenceResponse:
+        """Encode payload into an inference response.
+
+        .. deprecated:: Use :meth:`encode_response` instead.
+        """
         return cls.encode_response(model_name, payload, model_version)
 
     @classmethod
@@ -137,6 +151,10 @@ class RequestCodec:
     @classmethod
     @deprecated("The decode() method is now deprecated. Use decode_request() instead.")
     def decode(cls, request: InferenceRequest) -> Any:
+        """Decode an inference request into a high-level Python object.
+
+        .. deprecated:: Use :meth:`decode_request` instead.
+        """
         return cls.decode_request(request)
 
     @classmethod
@@ -227,10 +245,12 @@ class _CodecRegistry:
         input_codecs: dict[str, InputCodecLike] = {},
         request_codecs: dict[str, RequestCodecLike] = {},
     ):
+        """Initialise the registry with optional pre-populated codec maps."""
         self._input_codecs = input_codecs
         self._request_codecs = request_codecs
 
     def register_input_codec(self, content_type: str, codec: InputCodecLike):
+        """Register an input codec under the given content type key."""
         # TODO: Raise error if codec exists?
         self._input_codecs[content_type] = codec
 
@@ -240,6 +260,7 @@ class _CodecRegistry:
         payload: Any | None = None,
         type_hint: type[Any] | None = None,
     ) -> InputCodecLike | None:
+        """Look up an input codec by content type, payload, or type hint."""
         if content_type:
             return self._input_codecs.get(content_type)
         elif payload:
@@ -250,6 +271,7 @@ class _CodecRegistry:
         return None
 
     def find_input_codec_by_payload(self, payload: Any) -> InputCodecLike | None:
+        """Find an input codec whose ``can_encode`` accepts the payload."""
         return _find_codec_by_payload(
             payload, self._input_codecs.values()  # type: ignore
         )
@@ -257,11 +279,13 @@ class _CodecRegistry:
     def find_input_codec_by_type_hint(
         self, type_hint: type[Any]
     ) -> InputCodecLike | None:
+        """Find an input codec whose ``TypeHint`` matches the given type hint."""
         return _find_codec_by_type_hint(
             type_hint, self._input_codecs.values()  # type: ignore
         )
 
     def register_request_codec(self, content_type: str, codec: RequestCodecLike):
+        """Register a request codec under the given content type key."""
         # TODO: Raise error if codec exists?
         self._request_codecs[content_type] = codec
 
@@ -271,6 +295,7 @@ class _CodecRegistry:
         payload: Any | None = None,
         type_hint: type[Any] | None = None,
     ) -> RequestCodecLike | None:
+        """Look up a request codec by content type, payload, or type hint."""
         if content_type:
             return self._request_codecs.get(content_type)
         elif payload:
@@ -281,6 +306,7 @@ class _CodecRegistry:
         return None
 
     def find_request_codec_by_payload(self, payload: Any) -> RequestCodecLike | None:
+        """Find a request codec whose ``can_encode`` accepts the payload."""
         return _find_codec_by_payload(
             payload, self._request_codecs.values()  # type: ignore
         )
@@ -288,6 +314,7 @@ class _CodecRegistry:
     def find_request_codec_by_type_hint(
         self, type_hint: type[Any]
     ) -> RequestCodecLike | None:
+        """Find a request codec whose ``TypeHint`` matches the given type hint."""
         return _find_codec_by_type_hint(
             type_hint, self._request_codecs.values()  # type: ignore
         )
@@ -304,12 +331,14 @@ find_input_codec_by_type_hint = _codec_registry.find_input_codec_by_type_hint
 
 
 def register_request_codec(CodecKlass: RequestCodecLike):
+    """Class decorator that registers a :class:`RequestCodec` in the global registry."""
     if CodecKlass.ContentType is not None:
         _codec_registry.register_request_codec(CodecKlass.ContentType, CodecKlass)
     return CodecKlass
 
 
 def register_input_codec(CodecKlass: InputCodecLike):
+    """Class decorator that registers an :class:`InputCodec` in the global registry."""
     if CodecKlass.ContentType is not None:
         _codec_registry.register_input_codec(CodecKlass.ContentType, CodecKlass)
     return CodecKlass

@@ -14,12 +14,16 @@ DEFAULT_MODEL_SETTINGS_FILENAME = "model-settings.json"
 
 
 class ModelRepository(metaclass=abc.ABCMeta):
+    """Abstract base for model discovery backends."""
+
     @abc.abstractmethod
     async def list(self) -> builtins.list[ModelSettings]:
+        """Return settings for all discoverable models."""
         raise NotImplementedError
 
     @abc.abstractmethod
     async def find(self, name: str) -> builtins.list[ModelSettings]:
+        """Return settings for all versions of model *name*."""
         raise NotImplementedError
 
 
@@ -30,9 +34,13 @@ class SchemalessModelRepository(ModelRepository):
     """
 
     def __init__(self, root: str):
+        """Scan *root* for ``model-settings.json`` files on each ``list()`` call."""
         self._root = root
 
     async def list(self) -> builtins.list[ModelSettings]:
+        """Discover all models under the root directory by scanning for
+        ``model-settings.json`` files. Falls back to environment defaults
+        when none are found."""
         all_model_settings = []
 
         # TODO: Use an async alternative for filesys ops
@@ -64,6 +72,8 @@ class SchemalessModelRepository(ModelRepository):
         return all_model_settings
 
     async def find(self, name: str) -> builtins.list[ModelSettings]:
+        """Return settings for all versions of model *name*. Raises
+        :class:`ModelNotFound` if no matching settings exist."""
         all_settings = await self.list()
         selected = []
         for model_settings in all_settings:

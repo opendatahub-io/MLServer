@@ -1,4 +1,6 @@
 class ResponseCache:
+    """Abstract base class for inference response caches."""
+
     async def insert(self, key: str, value: str):
         """
         Method responsible for inserting value to cache.

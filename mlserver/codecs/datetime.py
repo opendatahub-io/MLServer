@@ -49,12 +49,14 @@ class DatetimeCodec(InputCodec):
 
     @classmethod
     def can_encode(cls, payload: Any) -> bool:
+        """Return True if every element in ``payload`` is a datetime."""
         return is_list_of(payload, datetime)
 
     @classmethod
     def encode_output(
         cls, name: str, payload: list[_Datetime], use_bytes: bool = True, **kwargs
     ) -> ResponseOutput:
+        """Encode a list of datetimes as ISO-8601 strings into a ResponseOutput."""
         packed = map(partial(_encode_datetime, use_bytes=use_bytes), payload)
         shape = [len(payload), 1]
         return ResponseOutput(
@@ -67,6 +69,7 @@ class DatetimeCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> list[datetime]:
+        """Decode ISO-8601 BYTES data from a ResponseOutput into datetimes."""
         packed = response_output.data.root
 
         return list(map(_decode_datetime, as_list(packed)))
@@ -75,6 +78,7 @@ class DatetimeCodec(InputCodec):
     def encode_input(
         cls, name: str, payload: list[_Datetime], use_bytes: bool = True, **kwargs
     ) -> RequestInput:
+        """Encode a list of datetimes as ISO-8601 strings into a RequestInput."""
         output = cls.encode_output(name, payload, use_bytes=use_bytes)
         return RequestInput(
             name=output.name,
@@ -86,6 +90,7 @@ class DatetimeCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> list[datetime]:
+        """Decode ISO-8601 BYTES data from a RequestInput into datetimes."""
         packed = request_input.data.root
 
         return list(map(_decode_datetime, as_list(packed)))

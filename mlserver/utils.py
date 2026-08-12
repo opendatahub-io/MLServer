@@ -16,6 +16,13 @@ from .version import __version__
 async def get_model_uri(
     settings: ModelSettings, wellknown_filenames: list[str] = []
 ) -> str:
+    """Resolve the model artifact URI from settings to an absolute file path.
+
+    For ``file://`` URIs (the default), resolves the path relative to the
+    settings source, checks for well-known filenames inside directories,
+    and raises :class:`InvalidModelURI` if nothing is found.
+    Non-file schemes are returned as-is.
+    """
     if not settings.parameters:
         raise InvalidModelURI(settings.name)
 
@@ -46,6 +53,11 @@ async def get_model_uri(
 
 
 def to_absolute_path(model_settings: ModelSettings, uri: str) -> str:
+    """Convert a relative model URI to an absolute path based on the settings source.
+
+    If the settings have no ``_source`` (e.g. created programmatically), the
+    URI is returned unchanged and treated as relative to the working directory.
+    """
     source = model_settings._source
     if source is None:
         # Treat path as either absolute or relative to the working directory of
@@ -58,6 +70,7 @@ def to_absolute_path(model_settings: ModelSettings, uri: str) -> str:
 
 
 def get_wrapped_method(f: Callable) -> Callable:
+    """Unwrap a decorated callable by following the ``__wrapped__`` chain."""
     while hasattr(f, "__wrapped__"):
         f = f.__wrapped__  # type: ignore
 
@@ -65,12 +78,15 @@ def get_wrapped_method(f: Callable) -> Callable:
 
 
 def generate_uuid() -> str:
+    """Generate a random UUID4 string for use as a unique identifier."""
     return str(uuid.uuid4())
 
 
 def insert_headers(
     inference_request: InferenceRequest, headers: dict[str, str]
 ) -> InferenceRequest:
+    """Attach transport-level headers (REST, gRPC, Kafka) into the request's
+    ``parameters.headers`` field, replacing any existing entries."""
     # Ensure parameters are present
     if inference_request.parameters is None:
         inference_request.parameters = Parameters()
@@ -93,6 +109,11 @@ def insert_headers(
 
 
 def extract_headers(inference_response: InferenceResponse) -> dict[str, str] | None:
+    """Remove and return the headers dict from a response's parameters.
+
+    Returns ``None`` if no headers are present. The headers field on the
+    response is cleared after extraction.
+    """
     if inference_response.parameters is None:
         return None
 
@@ -115,6 +136,11 @@ def _check_current_event_loop_policy() -> str:
 
 
 def install_uvloop_event_loop():
+    """Install uvloop as the asyncio event-loop policy if available.
+
+    Falls back silently to the default asyncio loop when uvloop is not
+    installed.
+    """
     if "uvloop" == _check_current_event_loop_policy():
         return
 
@@ -132,6 +158,7 @@ def install_uvloop_event_loop():
 
 
 def schedule_with_callback(coro, cb) -> Task:
+    """Create an asyncio task from a coroutine and attach a done-callback."""
     task = asyncio.create_task(coro)
     task.add_done_callback(cb)
     return task

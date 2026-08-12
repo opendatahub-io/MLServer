@@ -17,6 +17,7 @@ _STREAM_HANDLER_NAME = "stdout_stream_handler"
 
 
 def get_logger():
+    """Return the shared MLServer logger instance."""
     return logger
 
 
@@ -30,6 +31,7 @@ def get_log_level() -> int:
 
 
 def apply_logging_file(logging_settings: str | dict):
+    """Apply logging configuration from a JSON/INI file path or a dict."""
     if isinstance(logging_settings, str) and Path(logging_settings).is_file():
         if "json" in Path(logging_settings).suffix:
             with open(logging_settings) as settings_file:
@@ -58,6 +60,7 @@ class ModelLoggerFormatter(logging.Formatter):
     )
 
     def __init__(self, settings: Settings | None):
+        """Configure structured or unstructured log format based on *settings*."""
         self.use_structured_logging = (
             settings is not None and settings.use_structured_logging
         )
@@ -69,6 +72,7 @@ class ModelLoggerFormatter(logging.Formatter):
 
     @staticmethod
     def _format_unstructured_model_details(name: str, version: str) -> str:
+        """Format model name/version as ``[name:version]`` for plain-text logs."""
         if not name:
             return ""
         elif not version:
@@ -78,6 +82,7 @@ class ModelLoggerFormatter(logging.Formatter):
 
     @staticmethod
     def _format_structured_model_details(name: str, version: str) -> str:
+        """Format model name/version as JSON key-value pairs for structured logs."""
         if not name:
             return ""
         model_details = f', "model_name": "{name}"'
@@ -86,6 +91,7 @@ class ModelLoggerFormatter(logging.Formatter):
         return model_details
 
     def format(self, record: logging.LogRecord) -> str:
+        """Inject model name/version into *record* before formatting."""
         model_name = model_name_var.get("")
         model_version = model_version_var.get("")
 
@@ -99,6 +105,7 @@ class ModelLoggerFormatter(logging.Formatter):
 
 
 def _find_handler(logger: logging.Logger, handler_name: str) -> logging.Handler | None:
+    """Return the handler with *handler_name* on *logger*, or None."""
     for h in logger.handlers:
         if h.get_name() == handler_name:
             return h
@@ -106,6 +113,8 @@ def _find_handler(logger: logging.Logger, handler_name: str) -> logging.Handler 
 
 
 def configure_logger(settings: Settings | None = None):
+    """Set up the MLServer logger with appropriate level, formatter, and
+    optional file-based logging configuration from *settings*."""
     logger = get_logger()
 
     # Don't add handler twice

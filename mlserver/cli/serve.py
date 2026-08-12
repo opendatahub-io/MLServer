@@ -32,6 +32,7 @@ async def load_settings(
 
 
 def _path_exists(folder: str | None, file: str) -> bool:
+    """Check whether a file exists inside the given folder."""
     if folder is None:
         return False
 

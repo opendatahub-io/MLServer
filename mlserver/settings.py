@@ -213,6 +213,7 @@ def _reload_module(import_path: str):
 
 
 def _get_import_path(klass: type[Any]):
+    """Return the canonical dotted import path for a runtime class."""
     import_path = f"{klass.__module__}.{klass.__name__}"
     return canonicalize_runtime_import_path(import_path)
 
@@ -225,6 +226,11 @@ def _get_trusted_runtimes_artifact_path() -> str:
 def _load_image_baked_allowed_model_implementations(
     artifact_path: str,
 ) -> frozenset[str] | None:
+    """Load and validate the trusted runtimes JSON allowlist from disk.
+
+    Returns ``None`` when the file does not exist (development mode),
+    or a frozenset of canonical import paths (production mode).
+    """
     if not os.path.lexists(artifact_path):
         return None
     if not os.path.isfile(artifact_path):
@@ -262,6 +268,8 @@ def _load_image_baked_allowed_model_implementations(
 
 
 class BaseSettings(pydantic_settings.BaseSettings):
+    """Pydantic BaseSettings subclass with property-setter support and
+    alias-aware serialization defaults."""
     @no_type_check
     def __setattr__(self, name, value):
         """
@@ -307,6 +315,8 @@ class BaseSettings(pydantic_settings.BaseSettings):
 
 
 class CORSSettings(BaseSettings):
+    """Cross-Origin Resource Sharing configuration for the REST server."""
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE_SETTINGS,
         env_prefix=ENV_PREFIX_SETTINGS,
@@ -349,6 +359,9 @@ class CORSSettings(BaseSettings):
 
 
 class Settings(BaseSettings):
+    """Server-wide configuration for MLServer (ports, logging, metrics,
+    parallel workers, model repository, etc.)."""
+
     model_config = SettingsConfigDict(
         protected_namespaces=(),
         env_file=ENV_FILE_SETTINGS,
@@ -622,6 +635,7 @@ class ModelParameters(BaseSettings):
 
     @model_validator(mode="after")
     def set_inference_pool_gid(self) -> Self:
+        """Auto-generate an inference pool GID when the flag is set and none is provided."""
         if self.autogenerate_inference_pool_gid and self.inference_pool_gid is None:
             self.inference_pool_gid = str(uuid.uuid4())
         return self
@@ -659,6 +673,9 @@ class ModelParameters(BaseSettings):
 
 
 class ModelSettings(BaseSettings):
+    """Per-model configuration: implementation class, metadata, adaptive
+    batching, and instance-level parameters."""
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE_SETTINGS,
         env_prefix=ENV_PREFIX_MODEL_SETTINGS,
@@ -673,6 +690,8 @@ class ModelSettings(BaseSettings):
     _source: str | None = None
 
     def __init__(self, *args, **kwargs):
+        """Accept either a class reference or an import-path string for
+        ``implementation``, converting classes to their canonical import path."""
         # Ensure we still support inline init, e.g.
         # `ModelSettings(implementation=SumModel)`.
         implementation = kwargs.get("implementation", None)
@@ -683,6 +702,8 @@ class ModelSettings(BaseSettings):
 
     @classmethod
     def parse_file(cls, path: str) -> Self:  # type: ignore
+        """Load ModelSettings from a JSON file, recording the source path
+        for later use in dynamic runtime loading."""
         with open(path, "r") as f:
             obj = json.load(f)
             obj["_source"] = path
@@ -690,6 +711,8 @@ class ModelSettings(BaseSettings):
 
     @classmethod
     def model_validate(cls, obj: Any) -> Self:  # type: ignore
+        """Validate a dict into ModelSettings, preserving the ``_source``
+        path when present."""
         source = obj.pop("_source", None)
         model_settings = super().model_validate(obj)
         if source:
@@ -699,6 +722,7 @@ class ModelSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_trusted_runtime(self) -> Self:
+        """Reject untrusted runtime import paths during settings parsing."""
         # Step 1 (early validation): reject untrusted runtime import paths
         # while parsing settings so repository discovery can skip bad model
         # entries without taking down server startup.
@@ -718,6 +742,12 @@ class ModelSettings(BaseSettings):
 
     @property
     def implementation(self) -> type["MLModel"]:
+        """Lazily import and return the MLModel subclass for this model.
+
+        In development mode, the model folder is temporarily added to
+        ``sys.path`` so custom runtimes can be loaded without installation.
+        In production mode, only the standard import path is used.
+        """
         # Step 2 (defense in depth): validate again at access time in case
         # implementation_ was mutated programmatically after model validation.
         implementation = self.implementation_
@@ -752,6 +782,8 @@ class ModelSettings(BaseSettings):
 
     @implementation.setter
     def implementation(self, value: type["MLModel"]):
+        """Set the implementation from an MLModel class, validating its
+        import path against the trusted runtimes allowlist."""
         import_path = _get_import_path(value)
         import_path = canonicalize_runtime_import_path(import_path)
         _assert_trusted_runtime_import_path(import_path)
@@ -766,6 +798,7 @@ class ModelSettings(BaseSettings):
 
     @property
     def version(self) -> str | None:
+        """Convenience accessor that delegates to ``parameters.version``."""
         params = self.parameters
         if params is not None:
             return params.version

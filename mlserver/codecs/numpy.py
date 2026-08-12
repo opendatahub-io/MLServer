@@ -34,6 +34,7 @@ _NumpyToDatatype["U"] = Datatype.BYTES
 
 
 def to_dtype(input_or_output: InputOrOutput) -> "np.dtype":
+    """Convert a v2 Datatype to a NumPy dtype, handling BYTES variable-size elements."""
     dtype = _DatatypeToNumpy[Datatype(input_or_output.datatype)]
 
     if input_or_output.datatype == "BYTES":
@@ -51,6 +52,7 @@ def to_dtype(input_or_output: InputOrOutput) -> "np.dtype":
 
 
 def to_datatype(dtype: np.dtype) -> Datatype:
+    """Convert a NumPy dtype to the corresponding v2 Datatype enum, falling back to kind."""
     as_str = str(dtype)
 
     if as_str not in _NumpyToDatatype:
@@ -106,6 +108,7 @@ def _encode_data(data: np.ndarray, datatype: Datatype) -> list:
 
 
 def convert_nan(val):
+    """Replace NaN with None for JSON-safe serialisation."""
     if np.isnan(val):
         return None
 
@@ -123,10 +126,12 @@ class NumpyCodec(InputCodec):
 
     @classmethod
     def can_encode(csl, payload: Any) -> bool:
+        """Return True if the payload is a NumPy ndarray."""
         return isinstance(payload, np.ndarray)
 
     @classmethod
     def encode_output(cls, name: str, payload: np.ndarray, **kwargs) -> ResponseOutput:
+        """Encode a NumPy array into a ResponseOutput with inferred datatype and shape."""
         datatype = to_datatype(payload.dtype)
 
         shape = inject_batch_dimension(list(payload.shape))
@@ -141,10 +146,12 @@ class NumpyCodec(InputCodec):
 
     @classmethod
     def decode_output(cls, response_output: ResponseOutput) -> np.ndarray:
+        """Decode a ResponseOutput back into a NumPy array."""
         return cls.decode_input(response_output)  # type: ignore
 
     @classmethod
     def encode_input(cls, name: str, payload: np.ndarray, **kwargs) -> RequestInput:
+        """Encode a NumPy array into a RequestInput."""
         output = cls.encode_output(name=name, payload=payload)
 
         return RequestInput(
@@ -157,6 +164,7 @@ class NumpyCodec(InputCodec):
 
     @classmethod
     def decode_input(cls, request_input: RequestInput) -> np.ndarray:
+        """Decode a RequestInput into a NumPy array, reshaping to the declared shape."""
         model_data = _to_ndarray(request_input)
 
         # TODO: Check if reshape not valid

@@ -10,6 +10,8 @@ ListPayload = ListElement | list[ListElement]
 
 
 def is_list_of(payload: Any, instance_type: type[Any]):
+    """Return True if ``payload`` is a list where every element is an
+    instance of ``instance_type``."""
     if not isinstance(payload, list):
         return False
 

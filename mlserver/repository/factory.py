@@ -4,8 +4,13 @@ from pydantic import ImportString
 
 
 class ModelRepositoryFactory:
+    """Factory that instantiates the configured :class:`ModelRepository`
+    implementation from server settings."""
+
     @staticmethod
     def resolve_model_repository(settings: Settings) -> ModelRepository:
+        """Create the model repository specified in *settings*, defaulting
+        to :class:`SchemalessModelRepository`."""
         model_repository_implementation: ImportString = SchemalessModelRepository
 
         result: ModelRepository

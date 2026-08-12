@@ -47,11 +47,13 @@ def _compute_hash_of_string(string: str) -> str:
 
 
 async def compute_hash_of_file(tarball_path: str) -> str:
+    """Compute the SHA-256 hex digest of a file asynchronously."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _compute_hash_of_file, tarball_path)
 
 
 async def compute_hash_of_string(string: str) -> str:
+    """Compute the SHA-256 hex digest of a string asynchronously."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _compute_hash_of_string, string)
 
@@ -64,6 +66,11 @@ class Environment:
     """
 
     def __init__(self, env_path: str, env_hash: str, delete_env: bool = True):
+        """Wrap an extracted Python environment directory.
+
+        When *delete_env* is ``True`` (default), the environment directory
+        is removed on garbage collection.
+        """
         self._delete_env = delete_env
         self._env_path = env_path
         self.env_hash = env_hash
@@ -136,6 +143,8 @@ class Environment:
         return ""
 
     def __enter__(self) -> Self:
+        """Activate the environment by prepending its paths to ``sys.path``
+        and ``PATH``, and setting the multiprocessing executable."""
         self._prev_sys_path = sys.path
         self._prev_bin_path = os.environ["PATH"]
 
@@ -146,11 +155,14 @@ class Environment:
         return self
 
     def __exit__(self, *exc_details) -> None:
+        """Restore the original ``sys.path``, ``PATH``, and multiprocessing
+        executable."""
         multiprocessing.set_executable(sys.executable)
         sys.path = self._prev_sys_path
         os.environ["PATH"] = self._prev_bin_path
 
     def __del__(self) -> None:
+        """Delete the extracted environment directory if *delete_env* was set."""
         logger.info("Cleaning up environment")
         if self._delete_env:
             shutil.rmtree(self._env_path)

@@ -60,6 +60,7 @@ class DataPlane:
         )
 
     async def live(self) -> bool:
+        """Return ``True`` to indicate the server process is alive."""
         return True
 
     async def ready(self) -> bool:
@@ -86,10 +87,12 @@ class DataPlane:
             return any(model.ready for model in models)
 
     async def model_ready(self, name: str, version: str | None = None) -> bool:
+        """Return whether a specific model (and optional version) is ready."""
         model = await self._model_registry.get_model(name, version)
         return model.ready
 
     async def metadata(self) -> MetadataServerResponse:
+        """Return server-level metadata including name, version, and extensions."""
         # Built-in extensions that are always available
         builtin_extensions = ["model_repository", "runtime_security"]
         # Combine with user-configured extensions
@@ -102,6 +105,7 @@ class DataPlane:
 
     @staticmethod
     async def runtimes() -> RuntimeSecurityResponse:
+        """Return the runtime security posture (production vs development)."""
         from ..settings import (
             _load_image_baked_allowed_model_implementations,
             _get_trusted_runtimes_artifact_path,

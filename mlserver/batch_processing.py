@@ -60,6 +60,9 @@ del _get_error
 
 
 def click_async(f):
+    """Decorator that wraps an async function so Click can invoke it
+    synchronously via ``asyncio.run``."""
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         return asyncio.run(f(*args, **kwargs))
@@ -69,22 +72,29 @@ def click_async(f):
 
 @dataclass
 class BatchInputItem:
+    """A single input line from the batch file, tagged with its line index."""
+
     index: int
     item: bytes
 
 
 @dataclass
 class BatchOutputItem:
+    """A single inference result (or error), tagged with its original line index."""
+
     index: int
     item: bytes
 
 
 def setup_logging(debug: bool):
+    """Set the module logger to DEBUG when verbose/debug mode is enabled."""
     if debug:
         logger.setLevel(logging.DEBUG)
 
 
 def get_headers(request_id: str, headers: dict[str, str]) -> dict[str, str]:
+    """Build request headers, injecting ``seldon-puid`` and ``x-request-id``
+    when a request ID is provided."""
     headers = {"content-type": "application/json", **headers}
     if request_id:
         headers["seldon-puid"] = request_id
@@ -94,6 +104,9 @@ def get_headers(request_id: str, headers: dict[str, str]) -> dict[str, str]:
 
 @dataclass
 class TritonRequest:
+    """Wraps inputs and outputs in the tritonclient format expected by
+    ``InferenceServerClient.infer``."""
+
     id: str
     inputs: list[httpclient.InferInput]
     outputs: list[httpclient.InferRequestedOutput] | None
@@ -102,6 +115,7 @@ class TritonRequest:
     def from_inference_request(
         cls, inference_request: InferenceRequest, binary_data: bool
     ) -> Self:
+        """Convert an MLServer ``InferenceRequest`` into a ``TritonRequest``."""
         inputs = []
         for request_input in inference_request.inputs or []:
             new_input = httpclient.InferInput(
@@ -133,6 +147,8 @@ class TritonRequest:
 
 
 def infer_result_to_infer_response(item: httpclient.InferResult) -> InferenceResponse:
+    """Convert a tritonclient ``InferResult`` back to an MLServer
+    ``InferenceResponse``, decoding numpy outputs along the way."""
     infer_response = item.get_response()
 
     outputs = []
@@ -197,6 +213,8 @@ def _serialize_inference_error(index: int, error: Exception) -> BatchOutputItem:
 def preprocess_items(
     items: list[BatchInputItem], binary_data: bool
 ) -> tuple[TritonRequest, BatchedRequests, list[BatchOutputItem], dict[str, int]]:
+    """Parse raw input lines into a merged ``TritonRequest``, collecting
+    validation errors for lines that fail deserialization."""
     item_indices = {}
     inference_requests = {}
     invalid_inputs = []
@@ -232,6 +250,7 @@ def postprocess_items(
     batched: BatchedRequests,
     item_indices: dict[str, int],
 ) -> list[BatchOutputItem]:
+    """Split a batched inference result back into per-item output records."""
     full_inference_response = infer_result_to_infer_response(infer_result)
     output_items = []
     for item_id, inference_response in batched.split_response(
@@ -263,6 +282,7 @@ async def send_requests(
     retries: int,
     worker_id: int,
 ) -> httpclient.InferResult:
+    """Send a single inference request with automatic retry on failure."""
     for i in range(retries):
         try:
             return await triton_client.infer(
@@ -290,6 +310,7 @@ async def process_items(
     headers: dict[str, str],
     binary_data: bool,
 ) -> list[BatchOutputItem]:
+    """End-to-end processing of a micro-batch: preprocess, send, postprocess."""
     try:
         triton_request, batched, invalid_inputs, inference_indices = preprocess_items(
             items, binary_data
@@ -329,6 +350,7 @@ async def process_items(
 async def produce(
     queue: asyncio.Queue[list[BatchInputItem]], fname: str, batch_size: int
 ):
+    """Read input file line-by-line and enqueue micro-batches of the given size."""
     async with aiofiles.open(fname, "rb") as f:
         index = 0
         batch = []
@@ -355,6 +377,8 @@ async def consume(
     queue_in: asyncio.Queue[list[BatchInputItem]],
     queue_out: asyncio.Queue[list[BatchOutputItem]],
 ):
+    """Worker coroutine: pull micro-batches from ``queue_in``, process them,
+    and push results to ``queue_out``, respecting interval/jitter pacing."""
     while True:
         input_items = await queue_in.get()
         try:
@@ -388,6 +412,8 @@ async def consume(
 
 
 async def finalize(queue: asyncio.Queue[list[BatchOutputItem]], fname: str) -> int:
+    """Drain the output queue and write results to disk, returning the count
+    of processed instances when cancelled."""
     # TODO: Test if output directory is writtable, sysexit otherwise.
     counter = 0
     try:

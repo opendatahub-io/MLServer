@@ -88,6 +88,7 @@ def _pack_tensor(elem: InputOrOutput) -> bytes:
 
 
 def unpack(elem: InputOrOutput, raw: bytes) -> list:
+    """Unpack raw bytes into a list of tensor values based on the element's datatype."""
     if elem.datatype == "BYTES":
         return _unpack_bytes(raw)
 
@@ -95,6 +96,7 @@ def unpack(elem: InputOrOutput, raw: bytes) -> list:
 
 
 def pack(elem: InputOrOutput) -> bytes:
+    """Pack tensor data from an input/output element into raw bytes."""
     if elem.datatype == "BYTES":
         return _pack_bytes(elem.data)  # type: ignore
 
@@ -104,6 +106,7 @@ def pack(elem: InputOrOutput) -> bytes:
 def inject_raw(
     elems: list[InputOrOutput], raw_contents: list[bytes]
 ) -> list[InputOrOutput]:
+    """Unpack raw byte buffers into elements that have no inline data."""
     raw_idx = 0
     for elem in elems:
         if not elem.data:
@@ -118,6 +121,7 @@ def inject_raw(
 
 
 def extract_raw(elems: list[InputOrOutput]) -> tuple[list[InputOrOutput], list[bytes]]:
+    """Extract inline data from elements into separate raw byte buffers."""
     raw_contents = []
     for elem in elems:
         raw = pack(elem)

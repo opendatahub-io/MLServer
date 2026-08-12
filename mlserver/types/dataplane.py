@@ -10,25 +10,38 @@ from .base import BaseModel
 
 
 class MetadataServerResponse(BaseModel):
+    """Server metadata returned by the v2 inference protocol health endpoint."""
+
     name: str
     version: str
     extensions: list[str]
 
 
 class MetadataServerErrorResponse(BaseModel):
+    """Error response for server metadata requests."""
+
     error: str
 
 
 class RuntimeSecurityMode(Enum):
+    """Security mode controlling which model implementations the server allows."""
+
     PRODUCTION = "PRODUCTION"
     DEVELOPMENT = "DEVELOPMENT"
 
 
 class MetadataModelErrorResponse(BaseModel):
+    """Error response for model metadata requests."""
+
     error: str
 
 
 class Parameters(BaseModel):
+    """Extensible parameters attached to requests, inputs, or outputs.
+
+    Allows arbitrary extra fields beyond content_type and headers.
+    """
+
     model_config = ConfigDict(
         extra="allow",
     )
@@ -37,6 +50,8 @@ class Parameters(BaseModel):
 
 
 class TensorData(RootModel[list[Any] | Any]):
+    """Container for tensor payload data, supporting list-like access."""
+
     root: list[Any] | Any = Field(..., title="TensorData")
 
     def __iter__(self):
@@ -50,15 +65,21 @@ class TensorData(RootModel[list[Any] | Any]):
 
 
 class RequestOutput(BaseModel):
+    """Specifies a named output the client wants the server to produce."""
+
     name: str
     parameters: Parameters | None = None
 
 
 class InferenceErrorResponse(BaseModel):
+    """Error response returned when an inference request fails."""
+
     error: str | None = None
 
 
 class Datatype(Enum):
+    """V2 inference protocol tensor element data types."""
+
     BOOL = "BOOL"
     UINT8 = "UINT8"
     UINT16 = "UINT16"
@@ -75,6 +96,8 @@ class Datatype(Enum):
 
 
 class RuntimeSecurityResponse(BaseModel):
+    """Response describing the server's current security mode and allowed implementations."""
+
     mode: RuntimeSecurityMode
     allowed_model_implementations: list[str] | None = Field(
         None, description="Allowed model implementations (production mode only)."
@@ -82,6 +105,8 @@ class RuntimeSecurityResponse(BaseModel):
 
 
 class MetadataTensor(BaseModel):
+    """Describes the name, type, and shape of a model input or output tensor."""
+
     name: str
     datatype: Datatype
     shape: list[int]
@@ -89,6 +114,8 @@ class MetadataTensor(BaseModel):
 
 
 class RequestInput(BaseModel):
+    """A single named tensor sent as part of an inference request."""
+
     name: str
     shape: list[int]
     datatype: Datatype
@@ -97,6 +124,8 @@ class RequestInput(BaseModel):
 
 
 class ResponseOutput(BaseModel):
+    """A single named tensor returned as part of an inference response."""
+
     name: str
     shape: list[int]
     datatype: Datatype
@@ -105,6 +134,8 @@ class ResponseOutput(BaseModel):
 
 
 class InferenceResponse(BaseModel):
+    """V2 inference response containing one or more output tensors."""
+
     model_name: str
     model_version: str | None = None
     id: str | None = None
@@ -113,6 +144,8 @@ class InferenceResponse(BaseModel):
 
 
 class MetadataModelResponse(BaseModel):
+    """Model metadata describing supported versions, platform, and tensor schemas."""
+
     name: str
     versions: list[str] | None = None
     platform: str
@@ -122,6 +155,8 @@ class MetadataModelResponse(BaseModel):
 
 
 class InferenceRequest(BaseModel):
+    """V2 inference request containing one or more input tensors."""
+
     id: str | None = None
     parameters: Parameters | None = None
     inputs: list[RequestInput]

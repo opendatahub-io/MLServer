@@ -10,11 +10,13 @@ class InferenceMiddleware:
     def request_middleware(
         self, request: InferenceRequest, model_settings: ModelSettings
     ) -> InferenceRequest:
+        """Transform an inference request before it reaches the model."""
         raise NotImplementedError()
 
     def response_middleware(
         self, response: InferenceResponse, model_settings: ModelSettings
     ) -> InferenceResponse:
+        """Transform an inference response before it is returned to the caller."""
         raise NotImplementedError()
 
 
@@ -25,11 +27,13 @@ class InferenceMiddlewares(InferenceMiddleware):
     """
 
     def __init__(self, *inference_middlewares):
+        """Initialise with one or more :class:`InferenceMiddleware` instances."""
         self._middlewares = inference_middlewares
 
     def request_middleware(
         self, request: InferenceRequest, model_settings: ModelSettings
     ) -> InferenceRequest:
+        """Apply all registered request middlewares in order."""
         processed_request = request
         for middleware in self._middlewares:
             processed_request = middleware.request_middleware(
@@ -41,6 +45,7 @@ class InferenceMiddlewares(InferenceMiddleware):
     def response_middleware(
         self, response: InferenceResponse, model_settings: ModelSettings
     ) -> InferenceResponse:
+        """Apply all registered response middlewares in order."""
         processed_response = response
         for middleware in self._middlewares:
             processed_response = middleware.response_middleware(

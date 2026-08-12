@@ -16,7 +16,10 @@ from .utils import InputOrOutput
 
 # originally taken from: mlserver/rest/responses.py
 class _BytesJSONEncoder(json.JSONEncoder):
+    """JSON encoder that transparently decodes bytes payloads to strings."""
+
     def default(self, obj):
+        """Decode bytes to string; delegate everything else to the parent."""
         if isinstance(obj, bytes):
             # If we get a bytes payload, try to decode it back to a string on a
             # "best effort" basis
@@ -38,7 +41,7 @@ def _encode_object_to_bytes(obj: Any) -> str:
 
 
 def encode_to_json_bytes(v: Any) -> bytes:
-    """encodes a dict into json bytes, can deal with byte like values gracefully"""
+    """Encode a value to JSON bytes, gracefully handling bytes-like values."""
     if orjson is None:
         # Original implementation of starlette's JSONResponse, using our
         # custom encoder (capable of "encoding" bytes).
@@ -58,13 +61,17 @@ def encode_to_json_bytes(v: Any) -> bytes:
 
 
 def decode_from_bytelike_json_to_dict(v: bytes | str) -> dict:
+    """Decode JSON from bytes or str into a dict, using orjson when available."""
     if orjson is None:
         return json.loads(v)
     return orjson.loads(v)
 
 
 class JSONEncoderWithArray(json.JSONEncoder):
+    """JSON encoder that serialises NumPy arrays, floats, and ints to native Python types."""
+
     def default(self, obj):
+        """Convert NumPy types to native Python; delegate everything else to the parent."""
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, np.floating):
@@ -76,6 +83,7 @@ class JSONEncoderWithArray(json.JSONEncoder):
 
 
 def encode_to_json(v: Any, use_bytes: bool = True) -> str | bytes:
+    """Encode a value to a JSON string or UTF-8 bytes, with NumPy array support."""
     enc_v = json.dumps(
         v,
         ensure_ascii=False,
@@ -90,6 +98,7 @@ def encode_to_json(v: Any, use_bytes: bool = True) -> str | bytes:
 
 
 def decode_json_input_or_output(input_or_output: InputOrOutput) -> list[Any]:
+    """Parse each element of a tensor's data as JSON, returning a list of decoded objects."""
     packed = input_or_output.data.root
     unpacked = map(json.loads, as_list(packed))
     return list(unpacked)
