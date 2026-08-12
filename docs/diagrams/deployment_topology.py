@@ -96,3 +96,8 @@ with Diagram(
 
     # Security
     allowlist >> Edge(label="mount", color="#BD10E0", style="dotted") >> mlserver
+
+    # Response path
+    mlserver >> Edge(color="#7ED321", style="dashed") >> rest
+    rest >> Edge(color="#7ED321", style="dashed") >> ingress
+    ingress >> Edge(color="#7ED321", style="dashed") >> clients

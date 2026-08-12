@@ -260,6 +260,9 @@ html = f"""<!DOCTYPE html>
 {arrow("M 720,165 L 480,275", "arrow-red", "flow-left", "ah-red",
        "scrape :8082", 630, 200)}
 
+  <!-- Prometheus → Grafana -->
+{arrow("M 780,165 L 805,165", "arrow-red", "flow-right", "ah-red")}
+
   <!-- Kafka → MLServer -->
 {arrow("M 952,200 L 952,400 L 445,425", "arrow-purple", "flow-slow", "ah-purple",
        "consume / produce", 750, 395)}
