@@ -58,6 +58,8 @@ The system boundary of MLServer and its external interactions.
 
 ![System Context](../diagrams/system_context.png)
 
+![Software Architecture — Animated](../diagrams/architecture_animated.gif)
+
 ```mermaid
 graph TB
     subgraph "External Actors"

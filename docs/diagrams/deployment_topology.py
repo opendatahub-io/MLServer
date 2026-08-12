@@ -8,7 +8,6 @@ from diagrams.k8s.podconfig import ConfigMap
 from diagrams.onprem.monitoring import Prometheus, Grafana
 from diagrams.onprem.queue import Kafka
 from diagrams.onprem.client import Users
-from diagrams.onprem.network import Nginx
 from diagrams.generic.storage import Storage
 
 graph_attr = {

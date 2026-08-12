@@ -25,7 +25,9 @@ with Diagram(
 ):
     clients = Users("Inference Requests")
 
-    with Cluster("Main Process", graph_attr={"bgcolor": "#E8F4FD", "pencolor": "#4A90D9"}):
+    with Cluster(
+        "Main Process", graph_attr={"bgcolor": "#E8F4FD", "pencolor": "#4A90D9"}
+    ):
         rest = FastAPI("REST :8080")
         grpc = Server("gRPC :8081")
         dataplane = Rack("DataPlane")
@@ -36,17 +38,23 @@ with Diagram(
             req_queue = Storage("Request Queue\n(multiprocessing)")
             resp_queue = Storage("Response Queue\n(multiprocessing)")
 
-    with Cluster("Worker Process 1", graph_attr={"bgcolor": "#F0FFF0", "pencolor": "#7ED321"}):
+    with Cluster(
+        "Worker Process 1", graph_attr={"bgcolor": "#F0FFF0", "pencolor": "#7ED321"}
+    ):
         worker1_loop = Server("asyncio event loop")
         worker1_model = Rack("MLModel copy 1\n(sklearn / xgboost / ...)")
         worker1_metrics = Storage(".metrics/\n(Prometheus dir)")
 
-    with Cluster("Worker Process 2", graph_attr={"bgcolor": "#F0FFF0", "pencolor": "#7ED321"}):
+    with Cluster(
+        "Worker Process 2", graph_attr={"bgcolor": "#F0FFF0", "pencolor": "#7ED321"}
+    ):
         worker2_loop = Server("asyncio event loop")
         worker2_model = Rack("MLModel copy 2\n(sklearn / xgboost / ...)")
         worker2_metrics = Storage(".metrics/\n(Prometheus dir)")
 
-    with Cluster("Worker Process N", graph_attr={"bgcolor": "#F0FFF0", "pencolor": "#7ED321"}):
+    with Cluster(
+        "Worker Process N", graph_attr={"bgcolor": "#F0FFF0", "pencolor": "#7ED321"}
+    ):
         worker3_loop = Server("asyncio event loop")
         worker3_model = Rack("MLModel copy N\n(sklearn / xgboost / ...)")
         worker3_metrics = Storage(".metrics/\n(Prometheus dir)")
@@ -64,7 +72,11 @@ with Diagram(
     parallel_model >> Edge(label="predict()", color="#7ED321") >> dispatcher
 
     # Dispatcher → Queues
-    dispatcher >> Edge(label="enqueue request", color="#F5A623", style="bold") >> req_queue
+    (
+        dispatcher
+        >> Edge(label="enqueue request", color="#F5A623", style="bold")
+        >> req_queue
+    )
 
     # Queues → Workers (fan-out)
     req_queue >> Edge(label="dequeue", color="#F5A623") >> worker1_loop
@@ -82,7 +94,11 @@ with Diagram(
     worker3_loop >> Edge(label="result", color="#D0021B") >> resp_queue
 
     # Response back to dispatcher
-    resp_queue >> Edge(label="return result", color="#D0021B", style="bold") >> dispatcher
+    (
+        resp_queue
+        >> Edge(label="return result", color="#D0021B", style="bold")
+        >> dispatcher
+    )
 
     # Workers → Metrics
     worker1_model >> Edge(style="dotted", color="#9B59B6") >> worker1_metrics
@@ -90,6 +106,10 @@ with Diagram(
     worker3_model >> Edge(style="dotted", color="#9B59B6") >> worker3_metrics
 
     # Workers load model artifacts
-    worker1_model >> Edge(label="load()", color="#8B572A", style="dashed") >> model_store
+    (
+        worker1_model
+        >> Edge(label="load()", color="#8B572A", style="dashed")
+        >> model_store
+    )
     worker2_model >> Edge(color="#8B572A", style="dashed") >> model_store
     worker3_model >> Edge(color="#8B572A", style="dashed") >> model_store

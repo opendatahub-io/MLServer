@@ -3,7 +3,6 @@
 from diagrams import Cluster, Diagram, Edge
 from diagrams.onprem.client import Users
 from diagrams.onprem.compute import Server
-from diagrams.onprem.network import Nginx
 from diagrams.onprem.monitoring import Prometheus
 from diagrams.onprem.queue import Kafka
 from diagrams.programming.framework import FastAPI
@@ -34,7 +33,9 @@ with Diagram(
     prometheus = Prometheus("Prometheus")
     model_store = Storage("Model Artifact\nStore")
 
-    with Cluster("MLServer Boundary", graph_attr={"bgcolor": "#E8F4FD", "pencolor": "#4A90D9"}):
+    with Cluster(
+        "MLServer Boundary", graph_attr={"bgcolor": "#E8F4FD", "pencolor": "#4A90D9"}
+    ):
 
         with Cluster("Transport Layer"):
             rest = FastAPI("REST API\n:8080")
@@ -73,9 +74,25 @@ with Diagram(
     pool >> Edge(label="dispatch", color="#F5A623") >> workers
 
     # External integrations
-    kafka_ext >> Edge(label="consume / produce", color="#9B59B6", style="dashed") >> kafka_srv
-    prometheus >> Edge(label="scrape /metrics", color="#D0021B", style="dashed") >> metrics
+    (
+        kafka_ext
+        >> Edge(label="consume / produce", color="#9B59B6", style="dashed")
+        >> kafka_srv
+    )
+    (
+        prometheus
+        >> Edge(label="scrape /metrics", color="#D0021B", style="dashed")
+        >> metrics
+    )
 
     # Model loading
-    workers >> Edge(label="load artifacts", color="#8B572A", style="dashed") >> model_store
-    registry >> Edge(label="discover models", color="#8B572A", style="dashed") >> model_store
+    (
+        workers
+        >> Edge(label="load artifacts", color="#8B572A", style="dashed")
+        >> model_store
+    )
+    (
+        registry
+        >> Edge(label="discover models", color="#8B572A", style="dashed")
+        >> model_store
+    )

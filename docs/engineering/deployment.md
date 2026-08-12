@@ -4,6 +4,8 @@ This document covers how to deploy MLServer in different environments, from loca
 
 ![Deployment Topology](../diagrams/deployment_topology.png)
 
+![Deployment Topology — Animated](../diagrams/deployment_topology_animated.gif)
+
 ---
 
 ## Container Images
