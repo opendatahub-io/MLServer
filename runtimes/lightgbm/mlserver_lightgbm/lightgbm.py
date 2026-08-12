@@ -29,6 +29,7 @@ class LightGBMModel(MLModel):
         )
 
     async def load(self) -> bool:
+        """Load a LightGBM Booster model from a ``.bst`` artifact."""
         model_uri = await get_model_uri(
             self._settings, wellknown_filenames=WELLKNOWN_MODEL_FILENAMES
         )
@@ -38,6 +39,7 @@ class LightGBMModel(MLModel):
         return True
 
     async def predict(self, payload: types.InferenceRequest) -> types.InferenceResponse:
+        """Run inference using the loaded LightGBM Booster and return predictions."""
         decoded = self.decode_request(payload, default_codec=NumpyRequestCodec)
         prediction = self._model.predict(decoded)
 

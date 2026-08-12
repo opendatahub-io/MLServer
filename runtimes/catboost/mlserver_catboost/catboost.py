@@ -42,6 +42,7 @@ class CatboostModel(MLModel):
         )
 
     async def load(self) -> bool:
+        """Load a CatBoost classifier model from a ``.cbm`` or ``.bin`` artifact."""
         model_uri = await get_model_uri(
             self._settings, wellknown_filenames=WELLKNOWN_MODEL_FILENAMES
         )
@@ -52,6 +53,7 @@ class CatboostModel(MLModel):
         return self.ready
 
     async def predict(self, payload: types.InferenceRequest) -> types.InferenceResponse:
+        """Run inference using the loaded CatBoost classifier and return predictions."""
         decoded = self.decode_request(payload, default_codec=NumpyRequestCodec)
         prediction = self._model.predict(decoded)
 

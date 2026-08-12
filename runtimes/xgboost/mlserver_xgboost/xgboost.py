@@ -64,6 +64,11 @@ class XGBoostModel(MLModel):
         )
 
     async def load(self) -> bool:
+        """Load an XGBoost model via its scikit-learn interface.
+
+        Attempts to load as an ``XGBRegressor`` first; falls back to
+        ``XGBClassifier`` if that fails.
+        """
         model_uri = await get_model_uri(
             self._settings, wellknown_filenames=WELLKNOWN_MODEL_FILENAMES
         )
@@ -108,6 +113,12 @@ class XGBoostModel(MLModel):
         return outputs
 
     async def predict(self, payload: InferenceRequest) -> InferenceResponse:
+        """Run inference using the loaded XGBoost model.
+
+        Supports ``predict`` and ``predict_proba`` outputs. Defaults to
+        ``predict`` if no outputs are specified. Raises ``InferenceError``
+        if ``predict_proba`` is requested on a regression model.
+        """
         payload = self._check_request(payload)
         outputs = self._get_model_outputs(payload)
 

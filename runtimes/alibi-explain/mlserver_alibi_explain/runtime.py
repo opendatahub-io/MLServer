@@ -42,7 +42,12 @@ from mlserver_alibi_explain.errors import InvalidExplanationShape
 
 class AlibiExplainRuntimeBase(MLModel):
     """
-    Base class for Alibi-Explain models
+    Base class for alibi-explain runtimes.
+
+    Provides shared infrastructure for loading Alibi explainers and
+    running explanations as V2 inference predictions. Subclasses
+    (black-box, white-box, integrated-gradients) implement the
+    framework-specific ``_explain_impl`` and ``load`` methods.
     """
 
     def __init__(
@@ -153,7 +158,13 @@ class AlibiExplainRuntimeBase(MLModel):
 
 
 class AlibiExplainRuntime:
-    """Wrapper / Factory class for specific alibi explain runtimes"""
+    """
+    Factory that selects the appropriate alibi-explain runtime subclass.
+
+    Reads the ``explainer_type`` from model parameters and returns an
+    instance of the matching runtime (e.g. black-box, white-box, or
+    integrated-gradients).
+    """
 
     def __new__(cls, settings: ModelSettings):
         # TODO: we probably want to validate the enum more sanely here
