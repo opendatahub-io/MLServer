@@ -17,11 +17,13 @@ class BaseModel(pydantic.BaseModel):
     )
 
     def model_dump(self, exclude_unset=True, exclude_none=True, **kwargs):
+        """Dump to dict, excluding unset and ``None`` fields by default."""
         return super().model_dump(
             exclude_unset=exclude_unset, exclude_none=exclude_none, **kwargs
         )
 
     def model_dump_json(self, exclude_unset=True, exclude_none=True, **kwargs):
+        """Dump to JSON string, excluding unset and ``None`` fields by default."""
         return super().model_dump_json(
             exclude_unset=exclude_unset, exclude_none=exclude_none, **kwargs
         )

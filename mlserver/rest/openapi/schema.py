@@ -9,11 +9,13 @@ MODEL_VERSION_PARAMETER = "model_version"
 
 @lru_cache
 def get_openapi_schema() -> dict:
+    """Load and cache the bundled ``dataplane.json`` OpenAPI schema."""
     openapi_schema_path = files(__package__).joinpath("dataplane.json")
     return orjson.loads(openapi_schema_path.read_bytes())
 
 
 def get_model_schema_uri(model_name: str, model_version: str | None) -> str:
+    """Return the URI path for a model-specific OpenAPI schema endpoint."""
     base = f"/v2/models/{model_name}"
     if model_version:
         base = f"{base}/versions/{model_version}"
@@ -23,6 +25,7 @@ def get_model_schema_uri(model_name: str, model_version: str | None) -> str:
 
 @lru_cache
 def get_model_schema(model_name: str, model_version: str | None) -> dict:
+    """Build and cache an OpenAPI schema scoped to a single model."""
     openapi_schema = get_openapi_schema()
     generic_paths = openapi_schema["paths"]
     model_paths = {}
