@@ -56,6 +56,8 @@ Key architectural properties:
 
 The system boundary of MLServer and its external interactions.
 
+![System Context](../diagrams/system_context.png)
+
 ```mermaid
 graph TB
     subgraph "External Actors"
@@ -389,6 +391,8 @@ sequenceDiagram
 
 How MLServer bypasses the Python GIL using multiprocessing workers,
 dispatchers, and message queues.
+
+![Worker Pool Architecture](../diagrams/worker_pool.png)
 
 ```mermaid
 flowchart TB

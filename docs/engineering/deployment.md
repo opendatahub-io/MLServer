@@ -2,6 +2,8 @@
 
 This document covers how to deploy MLServer in different environments, from local development to production Kubernetes clusters.
 
+![Deployment Topology](../diagrams/deployment_topology.png)
+
 ---
 
 ## Container Images
