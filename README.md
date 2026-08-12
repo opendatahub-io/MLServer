@@ -197,16 +197,30 @@ sequence flows, and design decisions, see the
 ## Inference Runtimes
 
 Inference runtimes are the backend glue between MLServer and your ML framework.
-MLServer ships with pre-packaged runtimes for common frameworks, and you can
-[write custom runtimes](./docs/runtimes/custom.md) by subclassing `MLModel`.
+You can [write custom runtimes](./docs/runtimes/custom.md) by subclassing
+`MLModel`.
+
+### Shipped Runtimes (included in production images)
+
+These runtimes are installed in the ODH midstream container images and
+covered by the default trusted runtimes allowlist:
+
+| Framework | Package | Image | Documentation |
+|-----------|---------|-------|---------------|
+| Scikit-Learn | `mlserver-sklearn` | CPU | [Docs](./runtimes/sklearn) |
+| XGBoost | `mlserver-xgboost` | CPU | [Docs](./runtimes/xgboost) |
+| LightGBM | `mlserver-lightgbm` | CPU | [Docs](./runtimes/lightgbm) |
+| ONNX Runtime | `mlserver-onnx` | CPU + CUDA | [Docs](./runtimes/onnx) |
+
+### Community Runtimes (source available, not shipped)
+
+These runtimes have source code and tests in this repository but are **not**
+included in the production container images. They can be installed separately
+via `pip` or baked into custom images with `mlserver build`:
 
 | Framework | Package | Documentation |
 |-----------|---------|---------------|
-| Scikit-Learn | `mlserver-sklearn` | [Docs](./runtimes/sklearn) |
-| XGBoost | `mlserver-xgboost` | [Docs](./runtimes/xgboost) |
-| LightGBM | `mlserver-lightgbm` | [Docs](./runtimes/lightgbm) |
 | CatBoost | `mlserver-catboost` | [Docs](./runtimes/catboost) |
-| ONNX Runtime | `mlserver-onnx` | [Docs](./runtimes/onnx) |
 | MLflow | `mlserver-mlflow` | [Docs](./runtimes/mlflow) |
 | HuggingFace | `mlserver-huggingface` | [Docs](./runtimes/huggingface) |
 | Alibi Detect | `mlserver-alibi-detect` | [Docs](./runtimes/alibi-detect) |

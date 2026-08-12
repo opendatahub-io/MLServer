@@ -45,9 +45,16 @@ presence of a trusted runtimes allowlist file.
 [
   "mlserver_sklearn.SKLearnModel",
   "mlserver_xgboost.XGBoostModel",
-  "mlserver_huggingface.HuggingFaceRuntime"
+  "mlserver_lightgbm.LightGBMModel",
+  "mlserver_onnx.OnnxModel"
 ]
 ```
+
+> **Note:** The production images ship with these four runtimes. Community
+> runtimes (catboost, mlflow, huggingface, alibi-detect, alibi-explain,
+> mllib) are **not** included in production images. To use them, bake them
+> into a custom image with `mlserver build` and add their import paths to
+> the allowlist.
 
 The file is a JSON array of canonical Python import paths. Each entry must:
 

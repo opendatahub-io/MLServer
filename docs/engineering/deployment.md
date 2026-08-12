@@ -15,7 +15,12 @@ MLServer ships as a set of OCI container images built via Konflux CI pipelines.
 | `mlserver` | UBI 9 (Python 3.11) | No | CPU-only inference |
 | `mlserver-cuda` | UBI 9 + CUDA toolkit | NVIDIA | GPU-accelerated inference |
 
-Images are published to the Red Hat Quay registry. Each runtime plugin is included in the base image.
+Images are published to the Red Hat Quay registry. The CPU image includes four
+shipped runtimes (sklearn, xgboost, lightgbm, onnx) while the CUDA image
+includes only onnx. Community runtimes (catboost, mlflow, huggingface,
+alibi-detect, alibi-explain, mllib) have source in this repository but are
+**not** included in production images — install them separately via `pip` or
+bake them into custom images with `mlserver build`.
 
 ### Runtime Security Modes
 

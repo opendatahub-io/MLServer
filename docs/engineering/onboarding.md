@@ -38,16 +38,16 @@ MLServer/
 │   ├── cloudevents.py        # CloudEvents middleware
 │   └── cli/                 # CLI entry points (mlserver start/build)
 ├── runtimes/                # Runtime plugins (one per framework)
-│   ├── sklearn/
-│   ├── xgboost/
-│   ├── huggingface/
-│   ├── lightgbm/
-│   ├── catboost/
-│   ├── mlflow/
-│   ├── onnx/
-│   ├── alibi-detect/
-│   ├── alibi-explain/
-│   └── mllib/
+│   ├── sklearn/             # ← Shipped in production images
+│   ├── xgboost/             # ← Shipped in production images
+│   ├── lightgbm/            # ← Shipped in production images
+│   ├── onnx/                # ← Shipped in production images
+│   ├── huggingface/         # Community (source only, not shipped)
+│   ├── catboost/            # Community (source only, not shipped)
+│   ├── mlflow/              # Community (source only, not shipped)
+│   ├── alibi-detect/        # Community (source only, not shipped)
+│   ├── alibi-explain/       # Community (source only, not shipped)
+│   └── mllib/               # Community (source only, not shipped)
 ├── tests/                   # Test suite (pytest)
 ├── docs/                    # Sphinx documentation + engineering docs
 ├── hack/                    # Build scripts and utilities

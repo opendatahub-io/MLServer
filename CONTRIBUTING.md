@@ -106,14 +106,28 @@ cd runtimes/sklearn && poetry run pytest tests/
 
 1. Create a new directory under `runtimes/` with a Poetry project.
 2. Subclass `mlserver.MLModel` and implement `load()` and `predict()`.
-3. Add the canonical import path to `ALLOWED_MODEL_IMPLEMENTATIONS` in
-   `mlserver/settings.py`.
-4. Add tests validating allowlist behaviour.
-5. Add documentation in `docs/runtimes/`.
+3. Add tests in the runtime's `tests/` directory.
+4. Add documentation in `docs/runtimes/`.
 
-For custom runtimes not shipped with this repository, use the
-`mlserver build` workflow with `--allow-runtime` — do not extend the global
-allowlist.
+### Shipped vs Community Runtimes
+
+The ODH midstream production images include only **four shipped runtimes**:
+sklearn, xgboost, lightgbm, and onnx. These are controlled by the
+`ARG RUNTIMES` in the `Dockerfile` and the `odh-runtimes` dependency group
+in `pyproject.toml`.
+
+If a new runtime should be **shipped in production images**:
+
+5. Add the runtime to the `RUNTIMES` build arg in `Dockerfile`.
+6. Add the canonical import path to `ALLOWED_MODEL_IMPLEMENTATIONS` in
+   `mlserver/settings.py`.
+7. Add tests validating allowlist behaviour.
+
+If the runtime is a **community runtime** (source available but not shipped):
+
+5. It will remain installable via `pip` but will not be included in
+   production images.
+6. Users can bake it into custom images with `mlserver build`.
 
 ## Engineering Documentation
 
