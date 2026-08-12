@@ -2,34 +2,57 @@
 
 An open source inference server for your machine learning models.
 
-[![video_play_icon](https://user-images.githubusercontent.com/10466106/151803854-75d17c32-541c-4eee-b589-d45b07ea486d.png)](https://www.youtube.com/watch?v=aZHe3z-8C_w)
-
 ## Overview
 
-MLServer aims to provide an easy way to start serving your machine learning
-models through a REST and gRPC interface, fully compliant with [KFServing's V2
-Dataplane](https://docs.seldon.io/projects/seldon-core/en/latest/reference/apis/v2-protocol.html)
-spec. Watch a quick video introducing the project [here](https://www.youtube.com/watch?v=aZHe3z-8C_w).
+MLServer provides an easy way to start serving your machine learning
+models through REST and gRPC interfaces, fully compliant with the
+[V2 Inference Protocol](https://kserve.github.io/website/latest/modelserving/data_plane/v2_protocol/)
+(also known as the Open Inference Protocol).
 
-- Multi-model serving, letting users run multiple models within the same
-  process.
-- Ability to run [inference in parallel for vertical
-  scaling](https://mlserver.readthedocs.io/en/latest/user-guide/parallel-inference.html)
-  across multiple models through a pool of inference workers.
-- Support for [adaptive
-  batching](https://mlserver.readthedocs.io/en/latest/user-guide/adaptive-batching.html),
-  to group inference requests together on the fly.
-- Scalability with deployment in Kubernetes native frameworks, including
-  [Seldon Core](https://docs.seldon.io/projects/seldon-core/en/latest/graph/protocols.html#v2-kfserving-protocol) and
-  [KServe (formerly known as KFServing)](https://kserve.github.io/website/modelserving/v1beta1/sklearn/v2/), where
-  MLServer is the core Python inference server used to serve machine learning
-  models.
-- Support for the standard [V2 Inference Protocol](https://docs.seldon.io/projects/seldon-core/en/latest/reference/apis/v2-protocol.html) on
-  both the gRPC and REST flavours, which has been standardised and adopted by
-  various model serving frameworks.
+- **Multi-model serving** — run multiple models within a single server
+  instance, each with independent versioning and lifecycle.
+- **Parallel inference** — bypass the Python GIL via multiprocessing worker
+  pools for true CPU-parallel prediction across models.
+- **Adaptive batching** — transparently group incoming inference requests
+  into batches based on configurable size and time thresholds.
+- **Runtime security** — dual-mode (DEVELOPMENT / PRODUCTION) security model
+  controlling which model implementations can be loaded.
+- **Kubernetes native** — designed for deployment with
+  [KServe](https://kserve.github.io/website/), where MLServer is the core
+  Python inference server used to serve machine learning models.
+- **V2 Inference Protocol** — standardised REST and gRPC wire format adopted
+  by KServe, NVIDIA Triton, TorchServe, and other serving frameworks.
 
-You can read more about the goals of this project on the [initial design
-document](https://docs.google.com/document/d/1C2uf4SaAtwLTlBCciOhvdiKQ2Eay4U72VxAD4bXe7iU/edit?usp=sharing).
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "External"
+        Client["Client"]
+        Prometheus["Prometheus"]
+    end
+
+    subgraph "MLServer"
+        REST["REST Server :8080"]
+        GRPC["gRPC Server :8081"]
+        Metrics["Metrics Server :8082"]
+        DP["DataPlane"]
+        Registry["MultiModelRegistry"]
+        Pool["InferencePool"]
+    end
+
+    Client -->|HTTP| REST
+    Client -->|gRPC| GRPC
+    Prometheus -->|scrape| Metrics
+    REST --> DP
+    GRPC --> DP
+    DP --> Registry
+    Registry --> Pool
+```
+
+For detailed architecture documentation including component diagrams,
+sequence flows, and design decisions, see the
+[Engineering Documentation](./docs/engineering/architecture.md).
 
 ## Usage
 
@@ -173,6 +196,18 @@ MLServer to start serving your machine learning models.
 - [Serving a `HuggingFace` model](./docs/examples/huggingface/README.md)
 - [Multi-Model Serving with multiple frameworks](./docs/examples/mms/README.md)
 - [Loading / unloading models from a model repository](./docs/examples/model-repository/README.md)
+
+## Engineering Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](./docs/engineering/architecture.md) | System design with 8 Mermaid diagrams |
+| [API Reference](./docs/engineering/api.md) | REST, gRPC, and Kafka endpoint reference |
+| [ADRs](./docs/engineering/adr/) | Architecture Decision Records |
+| [Deployment](./docs/engineering/deployment.md) | Container images, Kubernetes, health checks |
+| [Security](./docs/engineering/security.md) | Runtime security model reference |
+| [Onboarding](./docs/engineering/onboarding.md) | New developer setup guide |
+| [FAQ](./docs/engineering/faq.md) | Common questions and troubleshooting |
 
 ## Developer Guide
 
