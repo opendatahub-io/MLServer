@@ -20,17 +20,6 @@ HANDLED_SIGNALS = [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT]
 
 
 class MLServer:
-    """Top-level server orchestrator that wires together all transport servers,
-    the model registry, parallel inference pools, and the data plane.
-
-    On construction the server creates the REST, gRPC, Kafka (optional), and
-    Metrics (optional) servers, a :class:`MultiModelRegistry` with lifecycle
-    hooks, and — when ``parallel_workers`` is enabled — an
-    :class:`InferencePoolRegistry` for GIL-free parallel inference.
-
-    The :meth:`start` / :meth:`stop` pair controls the full server lifecycle.
-    """
-
     def __init__(self, settings: Settings):
         self._settings = settings
         self._add_signal_handlers()
@@ -65,10 +54,6 @@ class MLServer:
         self._create_servers()
 
     def _create_model_registry(self) -> MultiModelRegistry:
-        """Build a :class:`MultiModelRegistry` with the appropriate lifecycle
-        hooks.  When parallel inference is enabled the pool registry's
-        ``load_model`` / ``reload_model`` / ``unload_model`` hooks are prepended
-        so that every model is transparently loaded into worker processes."""
         on_model_load = [
             self.add_custom_handlers,
             load_batching,
@@ -120,19 +105,6 @@ class MLServer:
             self._kafka_server = KafkaServer(self._settings, self._data_plane)
 
     async def start(self, models_settings: list[ModelSettings] = []):
-        """Start all transport servers and load the initial set of models.
-
-        The startup sequence is:
-        1. Validate runtime security configuration — abort if the trusted
-           runtimes allowlist is invalid.
-        2. Start REST, gRPC, Metrics, and Kafka servers concurrently.
-        3. Load all ``models_settings`` concurrently.
-        4. Mark ``startup_complete()`` so the readiness endpoint begins
-           returning ``true``.
-
-        If any model fails to load during startup the server is shut down
-        gracefully.
-        """
         # Validate runtime security configuration before starting servers to prevent
         # a window where endpoints are accessible but security hasn't been verified
         try:
@@ -171,7 +143,6 @@ class MLServer:
             await servers_task
 
     async def add_custom_handlers(self, model: MLModel) -> MLModel:
-        """Register any custom REST and Kafka endpoints exposed by *model*."""
         await self._rest_server.add_custom_handlers(model)
         if self._kafka_server:
             await self._kafka_server.add_custom_handlers(model)
@@ -182,8 +153,6 @@ class MLServer:
         return model
 
     async def reload_custom_handlers(self, old_model: MLModel, new_model: MLModel):
-        """Replace custom handlers: register *new_model*'s handlers then remove
-        *old_model*'s."""
         await self.add_custom_handlers(new_model)
         await self.remove_custom_handlers(old_model)
 
@@ -193,8 +162,6 @@ class MLServer:
         return new_model
 
     async def remove_custom_handlers(self, model: MLModel):
-        """Remove custom REST and Kafka endpoints previously registered by
-        *model*."""
         await self._rest_server.delete_custom_handlers(model)
         if self._kafka_server:
             await self._kafka_server.delete_custom_handlers(model)
@@ -218,8 +185,6 @@ class MLServer:
             )
 
     async def stop(self, sig: int | None = None):
-        """Gracefully shut down all server components in reverse-start order:
-        inference pools → Kafka → gRPC → REST → Metrics."""
         if self._inference_pool_registry:
             await self._inference_pool_registry.close()
 

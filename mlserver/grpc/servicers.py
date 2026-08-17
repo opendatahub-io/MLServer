@@ -25,12 +25,6 @@ from collections.abc import AsyncIterator
 
 
 class InferenceServicer(GRPCInferenceServiceServicer):
-    """gRPC implementation of the V2 Inference Protocol.  Converts between
-    protobuf messages and the internal :mod:`mlserver.types` dataclasses,
-    then delegates all business logic to the :class:`DataPlane` and
-    :class:`ModelRepositoryHandlers`.
-    """
-
     def __init__(
         self, data_plane: DataPlane, model_repository_handlers: ModelRepositoryHandlers
     ):

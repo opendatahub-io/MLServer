@@ -17,15 +17,6 @@ from .requests import BatchedRequests
 
 
 class AdaptiveBatcher:
-    """Transparently batches individual inference requests into grouped
-    predictions.
-
-    Wraps a model's ``predict()`` method so that callers see the same
-    single-request interface while the underlying model receives merged
-    batches.  Requests are accumulated until either ``max_batch_size`` is
-    reached or ``max_batch_time`` seconds have elapsed, whichever comes first.
-    """
-
     def __init__(self, model: MLModel):
         self._model = model
 
@@ -40,7 +31,6 @@ class AdaptiveBatcher:
         metrics.register("batch_request_queue", "counter of request queue batch size")
 
     async def predict(self, req: InferenceRequest) -> InferenceResponse:
-        """Queue a single request and wait for the batched prediction result."""
         internal_id, _ = await self._queue_request(req)
         self._start_batcher_if_needed()
         return await self._wait_response(internal_id)
@@ -108,8 +98,6 @@ class AdaptiveBatcher:
             self._requests.get_nowait()
 
     async def _batcher(self):
-        """Main batching coroutine: continuously collects request batches and
-        schedules prediction tasks for each batch concurrently."""
         async for batched in self._batch_requests():
             # We run prediction as a Task to ensure it gets scheduled
             # immediately.
@@ -130,9 +118,6 @@ class AdaptiveBatcher:
                 self._async_responses[internal_id].set_exception(err)
 
     async def _batch_requests(self) -> AsyncIterator[BatchedRequests]:
-        """Yield :class:`BatchedRequests` groups.  Each group is filled until
-        ``max_batch_size`` requests are collected or ``max_batch_time`` expires,
-        whichever comes first."""
         while not self._requests.empty():
             to_batch: dict[str, InferenceRequest] = {}
             start = time.time()

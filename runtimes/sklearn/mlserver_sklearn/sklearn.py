@@ -45,7 +45,6 @@ class SKLearnModel(MLModel):
         )
 
     async def load(self) -> bool:
-        """Load a scikit-learn model from a joblib or pickle artifact."""
         model_uri = await get_model_uri(
             self._settings, wellknown_filenames=WELLKNOWN_MODEL_FILENAMES
         )
@@ -54,12 +53,6 @@ class SKLearnModel(MLModel):
         return True
 
     async def predict(self, payload: InferenceRequest) -> InferenceResponse:
-        """Run inference using the loaded scikit-learn model.
-
-        Supports ``predict``, ``predict_proba``, and ``transform`` outputs,
-        selectable via the request's ``outputs`` field. Defaults to ``predict``
-        if no outputs are specified.
-        """
         payload = self._check_request(payload)
 
         outputs = self._get_model_outputs(payload)

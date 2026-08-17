@@ -217,12 +217,8 @@ class InferencePoolRegistry:
         return True
 
     def model_initialiser(self, model_settings: ModelSettings) -> MLModel:
-        """Initialise a model object for the ModelRegistry.
-
-        For models using custom environment tarballs, returns a bare
-        :class:`MLModel` placeholder to avoid importing the runtime class in
-        the main process.  The actual class is instantiated inside the worker
-        processes when ``load_model`` is called.
+        """
+        Used to initialise a model object in the ModelRegistry.
         """
         if not self._should_load_model(model_settings):
             # If parallel inference should not be used, instantiate the model
@@ -242,9 +238,6 @@ class InferencePoolRegistry:
         return MLModel(model_settings)
 
     async def load_model(self, model: MLModel) -> MLModel:
-        """Get or create the appropriate inference pool for *model* and load
-        the model into all of the pool's workers.  Returns a
-        :class:`ParallelModel` proxy."""
         if not self._should_load_model(model.settings):
             # Skip load if model has disabled parallel workers
             return model
@@ -256,9 +249,6 @@ class InferencePoolRegistry:
         return loaded
 
     async def reload_model(self, old_model: MLModel, new_model: MLModel) -> MLModel:
-        """Reload a model in the pool.  If the new model uses a different
-        environment, the old model is unloaded from its previous pool and the
-        old pool is closed if now empty."""
         if not self._should_load_model(new_model.settings):
             # TODO: What would happen if old_model had parallel inference
             # enabled and is disabled in new_model (and viceversa)?
@@ -277,8 +267,6 @@ class InferencePoolRegistry:
         return loaded
 
     async def unload_model(self, model: MLModel) -> MLModel:
-        """Unload a model from its inference pool.  If the pool is now empty
-        (and is not the default pool), close and remove it."""
         if not self._should_load_model(model.settings):
             # Skip unload if model has disabled parallel workers
             return model
@@ -301,8 +289,6 @@ class InferencePoolRegistry:
         return unloaded
 
     async def close(self):
-        """Close all inference pools (default + custom) and restore the
-        original SIGCHLD handler."""
         # Reset signal handler
         signal.signal(signal.SIGCHLD, self._original_sigchld_handler)
         await asyncio.gather(

@@ -39,11 +39,8 @@ async def _get_raw_body(request: Request) -> str:
 
 class MLflowRuntime(MLModel):
     """
-    Implementation of the MLModel interface to load and serve models
-    logged with MLflow's ``pyfunc`` flavor.
-
-    Exposes MLflow-compatible ``/invocations``, ``/ping``, ``/health``,
-    and ``/version`` endpoints alongside the standard V2 inference API.
+    Implementation of the MLModel interface to load and serve `scikit-learn`
+    models persisted with `joblib`.
     """
 
     def _configure_framework_logger(self) -> None:
@@ -166,7 +163,6 @@ class MLflowRuntime(MLModel):
         return Response(content=result.getvalue(), media_type="application/json")
 
     async def load(self) -> bool:
-        """Load an MLflow pyfunc model and synchronize metadata from its signature."""
         model_uri = await get_model_uri(self._settings)
         self._model = mlflow.pyfunc.load_model(model_uri)
 
@@ -208,11 +204,6 @@ class MLflowRuntime(MLModel):
         )
 
     async def predict(self, payload: InferenceRequest) -> InferenceResponse:
-        """Run inference via the MLflow pyfunc model.
-
-        Decodes the V2 request, forwards extra parameters to the model's
-        ``predict`` method, and encodes the output using ``TensorDictCodec``.
-        """
         decoded_payload = self.decode_request(payload)
         params = None
         if payload.parameters and payload.parameters.model_extra:
