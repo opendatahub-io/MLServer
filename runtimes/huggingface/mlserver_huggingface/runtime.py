@@ -20,14 +20,7 @@ from .metadata import METADATA
 
 
 class HuggingFaceRuntime(MLModel):
-    """
-    Implementation of the MLModel interface to load and serve Hugging Face
-    Transformers pipelines.
-
-    Supports any task available via ``transformers.pipeline`` (e.g.
-    text-classification, fill-mask, image-classification). The task and
-    model name are configured through ``HuggingFaceSettings``.
-    """
+    """Runtime class for specific Huggingface models"""
 
     def __init__(self, settings: ModelSettings):
         self.hf_settings = get_huggingface_settings(settings)
@@ -45,11 +38,6 @@ class HuggingFaceRuntime(MLModel):
         )
 
     async def load(self) -> bool:
-        """Load and cache the Hugging Face Transformers pipeline.
-
-        Downloads the model on the first call (off the event loop to avoid
-        blocking), then loads from the local cache on subsequent calls.
-        """
         # Loading & caching pipeline in asyncio loop to avoid blocking
         logger.info(f"Loading model for task '{self.hf_settings.task_name}'...")
         await asyncio.get_running_loop().run_in_executor(
@@ -65,7 +53,6 @@ class HuggingFaceRuntime(MLModel):
         return True
 
     async def predict(self, payload: InferenceRequest) -> InferenceResponse:
-        """Run the Transformers pipeline on the decoded request inputs."""
         # TODO: convert and validate?
         kwargs = HuggingfaceRequestCodec.decode_request(payload)
         args = kwargs.pop("args", [])
@@ -80,7 +67,6 @@ class HuggingFaceRuntime(MLModel):
         )
 
     async def unload(self) -> bool:
-        """Release GPU memory held by the Transformers pipeline (PyTorch only)."""
         # TODO: Free up Tensorflow's GPU memory
         is_torch = self._model.framework == "pt"
         if not is_torch:

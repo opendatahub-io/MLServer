@@ -30,8 +30,6 @@ def _spawn_worker(
     responses: Queue,
     env: Environment | None,
 ) -> Worker:
-    """Create and start a new :class:`Worker` process, optionally within an
-    isolated Python environment."""
     with env or nullcontext():
         worker = Worker(settings, responses, env)
         worker.start()
@@ -115,8 +113,6 @@ class InferencePool:
         return "default inference pool"
 
     async def on_worker_stop(self, pid: int, exit_code: int):
-        """Handle unexpected worker termination: notify the dispatcher, run
-        ``on_worker_stop`` hooks, spawn a replacement, and reload all models."""
         if pid not in self._workers:
             # If this worker didn't belong to this pool, ignore
             return
@@ -168,9 +164,6 @@ class InferencePool:
         return worker
 
     async def load_model(self, model: MLModel) -> MLModel:
-        """Broadcast a load message to all workers and return a
-        :class:`ParallelModel` proxy that dispatches ``predict()`` calls
-        across the pool."""
         load_message = ModelUpdateMessage(
             update_type=ModelUpdateType.Load,
             model_settings=model.settings,  # type: ignore
@@ -201,8 +194,6 @@ class InferencePool:
         return len(self._worker_registry) == 0
 
     async def close(self):
-        """Shut down all workers, terminate the response queue, and stop the
-        dispatcher."""
         await self._close_workers()
         await terminate_queue(self._responses)
         self._responses.close()

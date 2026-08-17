@@ -80,12 +80,6 @@ class AlibiDetectRuntime(MLModel):
         )
 
     async def load(self) -> bool:
-        """Load an alibi-detect detector and register drift metrics.
-
-        Supports both online (stateful) and offline detectors. Online
-        detectors will have their state saved periodically based on
-        ``state_save_freq``.
-        """
         self._model_uri = await get_model_uri(self._settings)
         try:
             self._model = load_detector(self._model_uri)
@@ -107,13 +101,6 @@ class AlibiDetectRuntime(MLModel):
         return True
 
     async def predict(self, payload: InferenceRequest) -> InferenceResponse:
-        """Run the detector on the input data.
-
-        For online detectors, inference runs immediately per request. For
-        offline detectors with ``batch_size`` configured, requests are
-        accumulated and detection runs once the batch is full; intermediate
-        requests return an empty response.
-        """
         # If batch is not configured, run the detector and return the output
         if self._online or not self._ad_settings.batch_size:
             return self._detect(payload)

@@ -19,9 +19,8 @@ class InferenceMiddleware:
 
 
 class InferenceMiddlewares(InferenceMiddleware):
-    """Composite middleware that chains a list of :class:`InferenceMiddleware`
-    instances.  Request middlewares are applied in order; response middlewares
-    are applied in the same order (not reversed).
+    """
+    Meta-middleware which applies a list of middlewares.
     """
 
     def __init__(self, *inference_middlewares):

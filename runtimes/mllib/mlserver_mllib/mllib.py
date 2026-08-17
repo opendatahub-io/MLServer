@@ -18,14 +18,6 @@ _SPARK_LOG_LEVELS = {
 
 
 class MLlibModel(MLModel):
-    """
-    Implementation of the MLModel interface to load and serve Apache Spark
-    MLlib models.
-
-    Starts a local ``SparkContext`` and loads the model using the
-    framework-specific loader determined by the model's parameters.
-    """
-
     def _configure_framework_logger(self) -> None:
         """Configure py4j logger and store Spark level for load().
 
@@ -42,7 +34,6 @@ class MLlibModel(MLModel):
         )
 
     async def load(self) -> bool:
-        """Initialize a SparkContext and load the MLlib model from its artifact."""
         # TODO: To be more configurable
         # Ref https://spark.apache.org/docs/latest/configuration.html
         conf = SparkConf().set("spark.driver.host", "127.0.0.1")
@@ -57,7 +48,6 @@ class MLlibModel(MLModel):
         return True
 
     async def predict(self, payload: types.InferenceRequest) -> types.InferenceResponse:
-        """Run inference on a single input tensor using the loaded MLlib model."""
         payload = self._check_request(payload)
         prediction = self._model.predict(payload.inputs[0].data)
 

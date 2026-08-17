@@ -33,19 +33,6 @@ def _noop():
 
 
 class Worker(Process):
-    """A multiprocessing worker that runs its own asyncio event loop and
-    ``MultiModelRegistry``.
-
-    Each worker listens on two queues via ``select()``:
-    - ``_requests``: inference request messages dispatched from the main
-      process.
-    - ``_model_updates``: load/unload commands to keep the worker's local
-      registry in sync.
-
-    Results are placed on the shared ``_responses`` queue for the
-    :class:`Dispatcher` to pick up.
-    """
-
     def __init__(
         self, settings: Settings, responses: Queue, env: Environment | None = None
     ):
@@ -71,9 +58,6 @@ class Worker(Process):
         return self.__executor
 
     def run(self):
-        """Entry point for the child process: activate the environment,
-        install uvloop, configure logging/metrics, ignore parent signals,
-        and run the async select loop."""
         ctx = nullcontext()
         if self._env:
             ctx = self._env
@@ -113,9 +97,6 @@ class Worker(Process):
         self._active = True
 
     async def coro_run(self):
-        """Main async loop: ``select()`` on request and model-update queues,
-        dispatching each to the appropriate handler.  Terminates when a
-        sentinel value is received on the model-updates queue."""
         self.__inner_init__()
         loop = asyncio.get_running_loop()
         while self._active:
