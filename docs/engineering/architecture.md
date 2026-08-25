@@ -880,7 +880,7 @@ In **PRODUCTION** mode, only import paths present in the
 | GET | `/v2/health/live` | `DataPlane.live()` |
 | GET | `/v2/health/ready` | `DataPlane.ready()` |
 | GET | `/v2` | `DataPlane.metadata()` |
-| GET | `/v2/runtime-security` | `DataPlane.runtimes()` |
+| GET | `/v2/runtimes` | `DataPlane.runtimes()` |
 | GET | `/v2/models/{name}/ready` | `DataPlane.model_ready()` |
 | GET | `/v2/models/{name}` | `DataPlane.model_metadata()` |
 | POST | `/v2/models/{name}/infer` | `DataPlane.infer()` |

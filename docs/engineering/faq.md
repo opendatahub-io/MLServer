@@ -152,10 +152,14 @@ This sets the limit to 100 MB (value is in bytes).
 
 ### How do I debug inference errors?
 
-1. Enable debug mode: `MLSERVER_DEBUG=true`
+1. In an isolated non-production environment, enable debug mode:
+   `MLSERVER_DEBUG=true`
 2. Check the inference error response body — it contains the exception message
 3. Review logs for the full stack trace
 4. Use the model-scoped Swagger UI at `/v2/models/{model_name}/docs` to test requests interactively
+
+Do not enable debug mode on a public production endpoint. Disable it after
+diagnosis.
 
 ### Models load slowly in parallel mode
 

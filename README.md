@@ -147,7 +147,7 @@ health checks, Prometheus metrics, and Swagger UI at
 | **Adaptive batching** | Transparently group incoming requests into batches by size or time threshold | Higher GPU/CPU utilization without client-side batching logic |
 | **Response caching** | LRU cache keyed on request payload | Avoid redundant computation for repeated inputs |
 | **Streaming inference** | Server-Sent Events (REST) and bidirectional streaming (gRPC) | Token-by-token generation for LLMs and iterative models |
-| **Runtime security** | DEVELOPMENT / PRODUCTION dual-mode allowlist | Prevent arbitrary code execution in production images |
+| **Runtime security** | DEVELOPMENT / PRODUCTION dual-mode allowlist for `ModelSettings.implementation` | Prevent arbitrary model-implementation imports in production images |
 | **V2 Inference Protocol** | REST + gRPC wire format standard | Client portability across serving frameworks |
 | **Prometheus metrics** | Request count, latency, and failure counters per model | Production observability out of the box |
 | **OpenTelemetry tracing** | Distributed trace propagation via OTLP | End-to-end request tracing across microservices |

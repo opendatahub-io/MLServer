@@ -18,7 +18,11 @@ presence of a trusted runtimes allowlist file.
 
 ## Threat Model
 
-### Threats Addressed
+### Threats Addressed (PRODUCTION mode)
+
+The controls below apply when MLServer is running in PRODUCTION mode.
+DEVELOPMENT mode intentionally relaxes several of these restrictions (see
+[ADR 0005](adr/0005-runtime-security-modes.md)).
 
 | Threat | Vector | Control |
 |--------|--------|---------|

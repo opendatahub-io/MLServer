@@ -38,7 +38,10 @@ coordinated by a `Dispatcher` and `InferencePool`:
 The `InferencePoolRegistry` extends this with environment isolation: models
 that declare a custom `environment_tarball` or `environment_path` are loaded
 in a dedicated pool with its own set of workers running inside that Python
-environment.
+environment. In PRODUCTION mode, custom environments and environment tarballs
+are rejected — they remain available only in non-production contexts (see
+[ADR 0005](0005-runtime-security-modes.md) and
+[architecture.md](../architecture.md)).
 
 ## Consequences
 

@@ -79,7 +79,8 @@ metadata:
 spec:
   containers:
     - name: mlserver
-      image: quay.io/opendatahub/mlserver:latest
+      # Pin to an immutable digest (verify signature / digest before deploy)
+      image: quay.io/opendatahub/mlserver@sha256:<image-digest>
       ports:
         - containerPort: 8080
           name: http
