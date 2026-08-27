@@ -3505,7 +3505,7 @@ xethub = ["mlflow-xethub"]
 
 [[package]]
 name = "mlserver-lightgbm"
-version = "1.7.1+rhaiv.8"
+version = "1.7.1+rhaiv.15"
 description = "LightGBM runtime for MLServer"
 optional = false
 python-versions = ">=3.9,<3.13"
@@ -3524,7 +3524,7 @@ url = "runtimes/lightgbm"
 
 [[package]]
 name = "mlserver-onnx"
-version = "1.7.1+rhaiv.8"
+version = "1.7.1+rhaiv.15"
 description = "ONNX runtime for MLServer"
 optional = false
 python-versions = ">=3.9,<3.13"
@@ -3550,7 +3550,7 @@ url = "runtimes/onnx"
 
 [[package]]
 name = "mlserver-sklearn"
-version = "1.7.1+rhaiv.8"
+version = "1.7.1+rhaiv.15"
 description = "Scikit-Learn runtime for MLServer"
 optional = false
 python-versions = ">=3.9,<3.13"
@@ -3569,7 +3569,7 @@ url = "runtimes/sklearn"
 
 [[package]]
 name = "mlserver-xgboost"
-version = "1.7.1+rhaiv.8"
+version = "1.7.1+rhaiv.15"
 description = "XGBoost runtime for MLServer"
 optional = false
 python-versions = ">=3.9,<3.13"
