@@ -24,7 +24,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/opendatahub/odh-mlserver-cuda:odh-stable
+    value: quay.io/opendatahub/odh-mlserver-cuda:odh-master
   - name: dockerfile
     value: Dockerfile.cuda
   - name: path-context
