@@ -150,9 +150,10 @@ poetry run tox -c ./runtimes/<name>  # Single runtime tests
 
 **ODH image tags** (`quay.io/opendatahub/mlserver`):
 
-- `master` push: `odh-stable` (floating)
+- `master` push: `odh-master` (floating)
 - `master` PR: `odh-pr` (floating) + `odh-pr-<PR#>` (e.g. `odh-pr-197`) + `odh-pr-<sha>` (pinned commit SHA)
-- `release-*` push: `odh-vX.Y[-EAN]` (e.g. `odh-v3.4` for GA, `odh-v3.5-EA2` for EA)
+- `release-*` push: `odh-stable` (floating)
+- `odh-vX.Y[-EAN]` push: `odh-vX.Y[-EAN]` (e.g. `odh-v3.4` for GA, `odh-v3.5-EA2` for EA)
 - `rhoai-staging`: no Konflux pipelines; image built from `Dockerfile.konflux` in RHDS
 
 ### RHDS Branches (`red-hat-data-services/MLServer`)
