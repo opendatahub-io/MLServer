@@ -16,10 +16,12 @@ These internal queues are used for [adaptive batching](./adaptive-batching.md) a
 
 | Metric Name                   | Description                                                         |
 | ----------------------------- | ------------------------------------------------------------------- |
-| `model_infer_request_success` | Number of successful inference requests.                            |
-| `model_infer_request_failure` | Number of failed inference requests.                                |
-| `batch_request_queue`         | Queue size for the [adaptive batching](./adaptive-batching.md) queue.  |
-| `parallel_request_queue`      | Queue size for the [inference workers](./parallel-inference.md) queue. |
+| `model_infer_request_success`  | Number of successful inference requests.                            |
+| `model_infer_request_failure`  | Number of failed inference requests.                                |
+| `model_cleanup_failures_total` | Number of failed model cleanup operations.                          |
+| `pool_cleanup_failures_total`  | Number of failed inference pool cleanup operations.                 |
+| `batch_request_queue`          | Queue size for the [adaptive batching](./adaptive-batching.md) queue.  |
+| `parallel_request_queue`       | Queue size for the [inference workers](./parallel-inference.md) queue. |
 
 ### REST Server Metrics
 

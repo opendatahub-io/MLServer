@@ -27,6 +27,11 @@ def check_pid(pid):
         return True
 
 
+async def _wait_for_workers(pool: InferencePool, expected: int):
+    while len(pool._workers) < expected:
+        await asyncio.sleep(0.1)
+
+
 def test_workers_start(inference_pool: InferencePool, settings: Settings):
     assert len(inference_pool._workers) == settings.parallel_workers
 
@@ -46,6 +51,12 @@ async def test_on_worker_stop(
     assert stopped_worker.pid is not None
     await inference_pool.on_worker_stop(stopped_worker.pid, 23)
     await stopped_worker.stop()
+
+    # Wait for replacement worker (started via create_task in on_worker_stop)
+    await asyncio.wait_for(
+        _wait_for_workers(inference_pool, settings.parallel_workers),
+        timeout=5,
+    )
 
     # Make sure worker is taken out of the rota and a new worker is started
     new_workers = list(inference_pool._workers.values())

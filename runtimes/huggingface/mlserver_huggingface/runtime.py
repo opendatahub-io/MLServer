@@ -68,11 +68,14 @@ class HuggingFaceRuntime(MLModel):
 
     async def unload(self) -> bool:
         # TODO: Free up Tensorflow's GPU memory
-        is_torch = self._model.framework == "pt"
+        model = getattr(self, "_model", None)
+        if model is None:
+            return True
+        is_torch = model.framework == "pt"
         if not is_torch:
             return True
 
-        uses_gpu = torch.cuda.is_available() and self._model.device != -1
+        uses_gpu = torch.cuda.is_available() and model.device != -1
         if not uses_gpu:
             # Nothing to free
             return True
