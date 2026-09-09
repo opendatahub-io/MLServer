@@ -1,4 +1,4 @@
---index-url=https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cuda12.9-ubi9-test/simple/
+--index-url=https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA2/cuda12.9-ubi9-test/simple/
 
 mlserver==1.7.1+rhaiv.11 \
     --hash=sha256:eeeea29b76dd585b8e650886617b930f8ebbc977d28520e52cb1689fd6b73d69
@@ -29,8 +29,8 @@ annotated-doc==0.0.5 \
 annotated-types==0.8.0 \
     --hash=sha256:38bf32a430b068969d1d44a85ec9d55f4fb8d30e74fce1dfd184ce7efe29efc6
 
-anyio==4.14.2 \
-    --hash=sha256:1f8877b96d4b2a16a4bb1262fa3c2b7920fac9ca2af89e3235cefe03d8274802
+anyio==4.15.1 \
+    --hash=sha256:055ff4517f86d40fd7905cf0d353394345a9189c52bf964481dbfd49f97840d6
 
 asgiref==3.12.1 \
     --hash=sha256:1a713f7da72510d3a079b68c3bce2f6a3678a02972fa469353164c6d679b9734
@@ -69,8 +69,8 @@ geventhttpclient==2.3.9 \
     --hash=sha256:8122b00a8d1998b9775aa81a6ffcef32cbd1689b8ac6e83728451baf005f6bf4 \
     --hash=sha256:d36b42149d8e8765c77bf01d18d9641d2accae2823e647f9d4c96d56bdc20779
 
-googleapis-common-protos==1.75.2 \
-    --hash=sha256:fc7cb43ebc9adf79a6527486dfe8008473e57c8e3712d8e751e4db9a35809ca7
+googleapis-common-protos==1.75.3 \
+    --hash=sha256:a51070659029413782b66e236c7197992b35e446d020b8de92a2244250a0d9a6
 
 greenlet==3.5.5 \
     --hash=sha256:275c35723aabf3b486d70677aa7232b0d39b463cbd6dfeca9a7d1b1bab5503d4 \
@@ -218,9 +218,9 @@ uvloop==0.22.1 \
     --hash=sha256:1d6d97b97da6fcbb254c4982b24898084910748d48572b2726ec7412f83c4712 \
     --hash=sha256:a299a1aa31ebc235d773002e56c992bef586858db76871b8eb1dff99393859dc
 
-wrapt==2.3.0 \
-    --hash=sha256:d170d467c428aa8d45397fdc5eb43c8b1f53aea1cd2de6282124640c0331fe49 \
-    --hash=sha256:fd9ff8113f5cc6bf3f9ad6cabf2b03d08b7f17f9c8704675dd432ca89ac9c1fe
+wrapt==2.4.0 \
+    --hash=sha256:2aceb204d8d675bfdfeb3e564fe26f7ce64d5da7e8c8fd9c44afade9cabd0fdd \
+    --hash=sha256:9f53067438b7fda84312a5167df485c5ac9ba9453449adf1b2430a9029ed192d
 
 yarl==1.24.5 \
     --hash=sha256:f8c0919c812fa65162832dfd9c1dab2da97b958e4c7488b4229046e46c80bb8c \
