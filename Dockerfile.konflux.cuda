@@ -1,4 +1,4 @@
-ARG BASE_IMAGE="quay.io/aipcc/base-images/cuda-12.9-el9.6:3.6.0-ea.1"
+ARG BASE_IMAGE="quay.io/aipcc/base-images/cuda-12.9-el9.8:3.6.0-ea.2"
 # Space-separated list of runtime import paths
 ARG TRUSTED_RUNTIMES="mlserver_onnx.OnnxModel"
 
@@ -10,7 +10,7 @@ USER 0
 
 # Set a few default environment variables.
 # CUDA library paths (LD_LIBRARY_PATH, etc.) are set by the AIPCC base
-# image cuda-12.9-el9.6; no explicit ENV needed here.
+# image cuda-12.9-el9.9; no explicit ENV needed here.
 ENV MLSERVER_MODELS_DIR=/mnt/models \
     MLSERVER_PATH=/opt/mlserver \
     HF_HOME=/opt/mlserver/.cache \
