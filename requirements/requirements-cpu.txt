@@ -1,4 +1,4 @@
---index-url=https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA1/cpu-ubi9-test/simple/
+--index-url=https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.6-EA2/cpu-ubi9-test/simple/
 
 mlserver==1.7.1+rhaiv.11 \
     --hash=sha256:ae0ceec130a43e65d7d9ed982eceff65fd2394c3c6be5024c19c7d30aa9ecca8
@@ -40,8 +40,8 @@ annotated-doc==0.0.5 \
 annotated-types==0.8.0 \
     --hash=sha256:0a1148cf189c24d548fc1ecaa7a889db3fd0ac49c24a672f9c03ed34ac8a75a9
 
-anyio==4.14.2 \
-    --hash=sha256:982d481dc430ecf619d63c5dd77b534442795acdd713344c5f405a69c20aadaa
+anyio==4.15.1 \
+    --hash=sha256:d1f60aa8c41adf7308c80b55a17904795f9dc042add5c4d4cf2443ab72576287
 
 asgiref==3.12.1 \
     --hash=sha256:77e3245382f9c602f238679b89de55f4fcde20e3bce1a9debfd4d2661563979f
@@ -62,6 +62,9 @@ certifi==2026.7.22 \
 
 click==8.5.0 \
     --hash=sha256:87dddcbfce6b3967d8bd284f76304e1c6c9e491552a0eafa332d2613d52306b5
+
+cloudpickle==3.1.2 \
+    --hash=sha256:a796d78b6c6ee2fec31ec4a44e74a44565cd914b373f28c382d5de60f6da232f
 
 fastapi==0.136.3 \
     --hash=sha256:086c88e291db94a1a18eaf94a92b94a2d87817d19dc600111911946a468fba40
@@ -84,8 +87,8 @@ geventhttpclient==2.3.9 \
     --hash=sha256:6d57c0f8d1d2bb9d81fc6acaa8f96d1a9a4ae413d0569ab4c084a02b1e92ae35 \
     --hash=sha256:c04686788e7adddcfb5336e6141dc88652d0257f0629936efb279bbf35044ef4
 
-googleapis-common-protos==1.75.2 \
-    --hash=sha256:6b909664310afcd123e982e200925e686ba1998a94eeac24371675a62218d56b
+googleapis-common-protos==1.75.3 \
+    --hash=sha256:03ee98a59092216cd75fd259fa9cd7ddb46db1c654e0416a9e70c5ff8dcb3516
 
 greenlet==3.5.5 \
     --hash=sha256:4e7f310eb32e72849ce2cc0c08b754d6eb754f530966806f83b8d10913d3acba \
@@ -103,8 +106,8 @@ h11==0.16.0 \
 idna==3.19 \
     --hash=sha256:492c0c229145c325e797f50f3aabad4fb65eaa27821e08da07542bf114dc64ed
 
-joblib==1.5.3 \
-    --hash=sha256:a92f544d14316a579117d71c0f4ee6f63b21d07c370fa1f3e23397fa38a0bc43
+joblib==1.6.0 \
+    --hash=sha256:b857f8d27e7c39fb6c0bdf5d513016e8ba866406f6c1cfd712101941f3afa5a3
 
 lightgbm==4.7.0 \
     --hash=sha256:0bf637ee2232bdcc63dfb4cfee7ed4af9ec9f99b70ec7f0be820465b289f2942 \
@@ -271,10 +274,10 @@ uvloop==0.22.1 \
     --hash=sha256:f36805aa99704ad523b74da67e3a7a25d12aaf5cd0f4d7ccacb0afff5f6468c3 \
     --hash=sha256:fbce902a6c38e78c850e5a09e6e6a6c6bda10d3c1c4bb51e0aa59f2bf20ca63c
 
-wrapt==2.3.0 \
-    --hash=sha256:232ab5824ac0b810d0dd99d69be06946985c9a1491b8eabb304be8593fcee7af \
-    --hash=sha256:979c99dbf4c6b365e021569176f32931505b82d328573abfc655901a5257ada4 \
-    --hash=sha256:d68acdf4e317ff7236bc64d07a48d6f819d58a9b506891353cce7eb0b4021e01
+wrapt==2.4.0 \
+    --hash=sha256:a4fedf175bf023a629ae990d7288c297f4d446c3fc03ae6a5a04fe6c4f6b7824 \
+    --hash=sha256:b3c75774800a8e85d6c2082b1ea938dd6185819492824e6354b8d842920d33e2 \
+    --hash=sha256:ef799d09d16966b046da2580e998f82e3fb2d8ca0ef8401dfe6bd0158784bd12
 
 xgboost==3.4.1 \
     --hash=sha256:5a8a4864bcc5129e709d5375b0d291117a847fccb83def6610077bf3b50c384b \
