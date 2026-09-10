@@ -127,10 +127,10 @@ multidict==6.7.1 \
 narwhals==2.25.0 \
     --hash=sha256:adbab6b85142191d33c69a5f683da4d3ab483828a0cb3e6c16de6efa8afd2f65
 
-numpy==2.5.2 \
-    --hash=sha256:0044665c94ad26cb4ba49db1b50e3634de4f7773859c90c612da981ab08fbd2f \
-    --hash=sha256:92b58e25cab7bc6e7ebc69952a84acdf7563af8b68ffc3296a6ae35fd347c6ed \
-    --hash=sha256:afaa711680b33da727d91bcfd75b131fee66f392bea5acd140df9e7907ed02b6
+numpy==2.5.3 \
+    --hash=sha256:3ac37c440e68634e3d8dbefa497975698806c7eac3cb6d123c247f0e53408c6a \
+    --hash=sha256:cee9ea66a9881e777e811ee0b464ef1c80222d4dedef37c03b8b75d547dc7777 \
+    --hash=sha256:f1bc5ed81669c0cfbadd178ef509f47d489ca9cf36255e9cfc9678aaa6c2532e
 
 onnx==1.22.0 \
     --hash=sha256:83c41cd31dd61a3ae8987ad153a036dc6b603ac4aab22233dae7fee2c276a26a \
@@ -224,10 +224,10 @@ python-dotenv==1.2.3 \
 python-multipart==0.0.32 \
     --hash=sha256:e186cbcbe7a58da8511e9e434091c731edff26e04a96caa119dae566a985ffb2
 
-python-rapidjson==1.23 \
-    --hash=sha256:9b97c2eca6e00c1f75b3e2a0af9363b17b0e8d911256a9f969d7649315722577 \
-    --hash=sha256:b70db0e27d8b96a58bda5cf1d6ff5023c4ecaf94a4ae8742f1888d5efe19e149 \
-    --hash=sha256:c34c67b54ebcdf31b115e3599ceff9cc6147cd3cd1f8f3b34ddc55cf7d415c83
+python-rapidjson==1.25 \
+    --hash=sha256:02dae2c75bd66158355af141b5c00ac8f4463cdd8b1dfa089361e08f9a41683f \
+    --hash=sha256:563a83741b4c3d8b3dc473f9a054ce9e8b8a933955442ca6dec92a82350ff153 \
+    --hash=sha256:b27dee74418f5969a6bee12a22519a118b5225db9498f38555b8ff92e70221ec
 
 scikit-learn==1.9.0 \
     --hash=sha256:2de7827f9b61bc41b1e7401e63904d59b93adf0413aa67e7363220a3a1f00395 \
