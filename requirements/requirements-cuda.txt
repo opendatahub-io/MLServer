@@ -183,9 +183,9 @@ python-dotenv==1.2.3 \
 python-multipart==0.0.32 \
     --hash=sha256:9971f80daafaaffedd03e695403601ca4eff17b902a74269036071ebe8f83c58
 
-python-rapidjson==1.23 \
-    --hash=sha256:0370436f5fd611171cbb7d602651e99d513eea1074ac8a296851d54147be1229 \
-    --hash=sha256:b34d3721bc76345610203f123964ad1bd0c3a684dd091c027eb3633e2e434709
+python-rapidjson==1.25 \
+    --hash=sha256:e7d0dc17245fafca6e2fa32c4244de9edf58f7b2321889ffa711d68b21713351 \
+    --hash=sha256:fbec06599523b55e327af317620e15a0de21d99d24be224eaff866412813b707
 
 setuptools==84.0.0 \
     --hash=sha256:8da90a8b235473f85581beea8f7c388a68dd565a8c70ae76ec860ad6d3bb495a
