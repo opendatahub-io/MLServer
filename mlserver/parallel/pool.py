@@ -7,11 +7,13 @@ from collections.abc import Awaitable, Callable, Iterable, Sequence
 from prometheus_client import Counter
 
 from ..model import MLModel
+from ..utils import defer_cancellation, with_operation_lock
 from ..types import InferenceRequest, InferenceResponse
 from ..settings import Settings, ModelSettings
 from ..env import Environment
 
 from .model import ParallelModel
+from .errors import InferencePoolUnavailable
 from .worker import Worker, WorkerModelHook
 from .logging import logger
 from .utils import configure_inference_pool, terminate_queue
@@ -64,6 +66,9 @@ class WorkerRegistry:
 
     def has_model(self, model_settings: ModelSettings) -> bool:
         return self._key(model_settings) in self._models
+
+    def clear(self) -> None:
+        self._models.clear()
 
     def __len__(self) -> int:
         return len(self._models)
@@ -119,6 +124,7 @@ class InferencePool:
         self._worker_registry = WorkerRegistry()
         self._pending_reload: dict[tuple[str, str], MLModel] = {}
         self._closing = False
+        self._operation_lock = asyncio.Lock()
         self._settings = settings
         self._responses: Queue[ModelResponseMessage] = Queue()
         for _ in range(self._settings.parallel_workers):
@@ -215,6 +221,8 @@ class InferencePool:
                 exc_info=True,
             )
 
+    @with_operation_lock(lambda self, *args, **kwargs: self._operation_lock)
+    @defer_cancellation
     async def _start_worker(self) -> Worker | None:
         # Do not start a worker if the pool is closing
         if self._closing:
@@ -294,7 +302,11 @@ class InferencePool:
     def _model_key(self, model_settings: ModelSettings) -> tuple[str, str]:
         return (model_settings.name, model_settings.version or "")
 
+    @with_operation_lock(lambda self, *args, **kwargs: self._operation_lock)
+    @defer_cancellation
     async def load_model(self, model: MLModel) -> MLModel:
+        if self._closing:
+            raise InferencePoolUnavailable(self.name)
         # Check for reload
         reload = self.has_model(model.settings)
 
@@ -329,7 +341,11 @@ class InferencePool:
             self._pending_reload[self._model_key(model.settings)] = parallel_model
         return parallel_model
 
+    @with_operation_lock(lambda self, *args, **kwargs: self._operation_lock)
+    @defer_cancellation
     async def unload_model(self, model: MLModel) -> MLModel:
+        if self._closing:
+            raise InferencePoolUnavailable(self.name)
         # Unregister any pending reloads - unload overrides them
         pending_model = self._pending_reload.pop(self._model_key(model.settings), None)
 
@@ -370,7 +386,8 @@ class InferencePool:
     def empty(self) -> bool:
         return len(self._worker_registry) == 0
 
-    async def close(self):
+    @with_operation_lock(lambda self: self._operation_lock)
+    async def close(self) -> None:
         if self._closing:
             return
         self._closing = True
@@ -412,6 +429,11 @@ class InferencePool:
                 exc_info=True,
             )
             cleanup_errors.append(e)
+
+        # The pool is terminal after close. No model state can be replayed or
+        # rolled back, so release the tracking references after cleanup.
+        self._worker_registry.clear()
+        self._pending_reload.clear()
 
         if cleanup_errors:
             # Track cleanup failures

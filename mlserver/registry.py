@@ -8,6 +8,8 @@ from prometheus_client import Counter
 
 from .context import model_context
 from .model import MLModel
+from .utils import defer_cancellation, with_operation_lock
+from weakref import WeakValueDictionary
 from .errors import ModelNotFound
 from .logging import logger
 from .settings import ModelSettings
@@ -102,6 +104,7 @@ class SingleModelRegistry:
         on_model_unload: Sequence[ModelRegistryHook] = [],
         model_initialiser: ModelInitialiser = model_initialiser,
     ):
+        self._operation_lock = asyncio.Lock()
         self._versions: dict[str, MLModel] = {}
         self._pending_reload: dict[str, MLModel] = {}
         self._default: MLModel | None = None
@@ -169,6 +172,8 @@ class SingleModelRegistry:
         self._default = self._find_default()
         return self._default
 
+    @with_operation_lock(lambda self, *args, **kwargs: self._operation_lock)
+    @defer_cancellation
     async def load(
         self, model_settings: ModelSettings, parallel: bool = False
     ) -> MLModel:
@@ -251,7 +256,9 @@ class SingleModelRegistry:
 
         return model
 
-    async def unload(self):
+    @with_operation_lock(lambda self, *args, **kwargs: self._operation_lock)
+    @defer_cancellation
+    async def unload(self) -> None:
         """
         Unload all versions of this model. Always a fresh unload — never called
         as part of a reload operation. Best-effort — all versions are attempted
@@ -281,7 +288,11 @@ class SingleModelRegistry:
             self._versions.clear()
             self._clear_default()
 
-    async def unload_version(self, version: str | None = None, rollback: bool = False):
+    @with_operation_lock(lambda self, *args, **kwargs: self._operation_lock)
+    @defer_cancellation
+    async def unload_version(
+        self, version: str | None = None, rollback: bool = False
+    ) -> None:
         """
         Unload a specific version of the model.
 
@@ -441,6 +452,10 @@ class MultiModelRegistry:
         on_model_unload: Sequence[ModelRegistryHook] = [],
         model_initialiser: ModelInitialiser = model_initialiser,
     ):
+        # Locks outlive registry entries while any owner or waiter holds them.
+        self._operation_locks: WeakValueDictionary[str, asyncio.Lock] = (
+            WeakValueDictionary()
+        )
         self._models: dict[str, SingleModelRegistry] = {}
         self._on_model_load = on_model_load
         self._on_model_unload = on_model_unload
@@ -468,6 +483,15 @@ class MultiModelRegistry:
         """
         self._startup_complete = True
 
+    def _get_operation_lock(self, name: str) -> asyncio.Lock:
+        return self._operation_locks.setdefault(name, asyncio.Lock())
+
+    @with_operation_lock(
+        lambda self, model_settings, *args, **kwargs: self._get_operation_lock(
+            model_settings.name
+        )
+    )
+    @defer_cancellation
     async def load(
         self, model_settings: ModelSettings, parallel: bool = False
     ) -> MLModel:
@@ -500,7 +524,9 @@ class MultiModelRegistry:
                 del self._models[model_settings.name]
             raise
 
-    async def unload(self, name: str):
+    @with_operation_lock(lambda self, name: self._get_operation_lock(name))
+    @defer_cancellation
+    async def unload(self, name: str) -> None:
         """
         Unload all versions of a model and remove it from the registry.
         Always a fresh unload — never called as part of a reload operation.
@@ -515,9 +541,13 @@ class MultiModelRegistry:
             # unload regardless of success (models removed before actual unload)
             del self._models[name]
 
+    @with_operation_lock(
+        lambda self, name, *args, **kwargs: self._get_operation_lock(name)
+    )
+    @defer_cancellation
     async def unload_version(
         self, name: str, version: str | None = None, rollback: bool = False
-    ):
+    ) -> None:
         """
         Unload a specific version of a model. Removes the
         :class:`SingleModelRegistry` if it becomes empty after the unload.

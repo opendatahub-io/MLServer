@@ -1,5 +1,7 @@
 import asyncio
+from weakref import WeakValueDictionary
 
+from ..utils import defer_cancellation, with_operation_lock
 from ..settings import ModelSettings
 from ..registry import MultiModelRegistry
 from ..repository import ModelRepository
@@ -20,6 +22,9 @@ def _model_key(model_settings: ModelSettings) -> tuple[str, str]:
 
 class ModelRepositoryHandlers:
     def __init__(self, repository: ModelRepository, model_registry: MultiModelRegistry):
+        self._operation_locks: WeakValueDictionary[str, asyncio.Lock] = (
+            WeakValueDictionary()
+        )
         self._repository = repository
         self._model_registry = model_registry
 
@@ -107,6 +112,11 @@ class ModelRepositoryHandlers:
         except ModelNotFound:
             return State.UNAVAILABLE
 
+    def _get_operation_lock(self, name: str) -> asyncio.Lock:
+        return self._operation_locks.setdefault(name, asyncio.Lock())
+
+    @with_operation_lock(lambda self, name: self._get_operation_lock(name))
+    @defer_cancellation
     async def load(self, name: str) -> bool:
         all_model_settings = await self._repository.find(name)
 
@@ -145,11 +155,15 @@ class ModelRepositoryHandlers:
                 raise ModelUnloadError(
                     f"Failed to cleanup {len(unload_failures)} of "
                     f"{len(stale_versions)} stale version(s) of model {name} "
-                    f"during repository load sync."
+                    f"during repository load sync. Stale versions removed "
+                    "from registry, but some resources "
+                    "may still be held."
                 )
 
         return True
 
+    @with_operation_lock(lambda self, name: self._get_operation_lock(name))
+    @defer_cancellation
     async def unload(self, name: str) -> bool:
         await self._model_registry.unload(name)
 

@@ -1,16 +1,23 @@
 import os
 import uuid
 import asyncio
+import inspect
 import urllib.parse
 
 from asyncio import Task
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any, ParamSpec, TypeVar
+from functools import wraps
 
 from .logging import logger
 from .types import InferenceRequest, InferenceResponse, Parameters
 from .settings import ModelSettings
 from .errors import InvalidModelURI
 from .version import __version__
+
+
+T = TypeVar("T")
+P = ParamSpec("P")
 
 
 async def get_model_uri(
@@ -148,3 +155,77 @@ def get_normalized_version(version: str | None = None) -> str:
     """
     resolved_version = version or __version__
     return resolved_version.split("+", 1)[0]
+
+
+async def _defer_cancellation(operation: Awaitable[T]) -> T:
+    """Wait for an accepted operation to settle before propagating cancellation.
+
+    The operation runs in a shielded task so caller cancellation does not
+    interrupt it. If the caller is cancelled, wait for the task to finish,
+    log any operation failure, and then re-raise the caller's cancellation.
+    """
+    task = asyncio.ensure_future(operation)
+    cancellation = None
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError as cancelled:
+            cancellation = cancelled
+        except Exception:
+            break
+    if cancellation is not None:
+        if not task.cancelled():
+            error = task.exception()
+            if error is not None:
+                logger.error(
+                    "Model operation failed after caller cancellation",
+                    exc_info=(type(error), error, error.__traceback__),
+                )
+        raise cancellation
+    return task.result()
+
+
+def defer_cancellation(
+    method: Callable[P, Awaitable[T]],
+) -> Callable[P, Coroutine[Any, Any, T]]:
+    """Defer caller cancellation until an accepted operation has settled.
+
+    Apply this inside :func:`with_operation_lock` so cancellation remains
+    immediate while waiting for the lock, then is deferred after the operation
+    has acquired the lock and begun changing lifecycle state.
+    """
+
+    @wraps(method)
+    async def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+        return await _defer_cancellation(method(*args, **kwargs))
+
+    return wrapped
+
+
+def with_operation_lock(
+    lock_for: Callable[..., asyncio.Lock | Awaitable[asyncio.Lock]],
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Coroutine[Any, Any, T]]]:
+    """Acquire the operation lock before running the decorated method.
+
+    ``lock_for`` is called for each invocation and may return a lock directly
+    or an awaitable that resolves to one.
+
+    Resolution and acquisition remain
+    cancellable. To defer cancellation after acceptance, compose this
+    decorator outside :func:`defer_cancellation`.
+    """
+
+    def decorate(
+        method: Callable[P, Awaitable[T]]
+    ) -> Callable[P, Coroutine[Any, Any, T]]:
+        @wraps(method)
+        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> T:
+            lock = lock_for(*args, **kwargs)
+            if inspect.isawaitable(lock):
+                lock = await lock
+            async with lock:
+                return await method(*args, **kwargs)
+
+        return wrapped
+
+    return decorate

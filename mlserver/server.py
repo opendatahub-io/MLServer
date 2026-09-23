@@ -103,6 +103,31 @@ class MLServer:
         if self._settings.kafka_enabled:
             self._kafka_server = KafkaServer(self._settings, self._data_plane)
 
+    async def _settle_server_tasks(
+        self,
+        server_tasks: list[asyncio.Task],
+        servers_task: asyncio.Future,
+    ) -> None:
+        """Cancel, await, and report transport tasks during startup cleanup."""
+        for server_task in server_tasks:
+            if not server_task.done():
+                server_task.cancel()
+
+        server_results = await asyncio.gather(*server_tasks, return_exceptions=True)
+        for server_error in server_results:
+            if isinstance(server_error, Exception):
+                logger.error(
+                    "A server task failed while handling an earlier error",
+                    exc_info=(
+                        type(server_error),
+                        server_error,
+                        server_error.__traceback__,
+                    ),
+                )
+
+        # Consume the original aggregate created for asyncio.shield().
+        await asyncio.gather(servers_task, return_exceptions=True)
+
     async def start(self, models_settings: list[ModelSettings] = []):
         # Validate runtime security configuration before starting servers to prevent
         # a window where endpoints are accessible but security hasn't been verified
@@ -122,7 +147,8 @@ class MLServer:
         if self._kafka_server:
             servers.append(self._kafka_server.start())
 
-        servers_task = asyncio.gather(*servers)
+        server_tasks = [asyncio.create_task(server) for server in servers]
+        servers_task = asyncio.gather(*server_tasks)
 
         tasks = []
         try:
@@ -133,29 +159,45 @@ class MLServer:
             await asyncio.gather(*tasks)
             # Mark startup complete only if all models loaded successfully
             self._model_registry.startup_complete()
-        except Exception:
-            # If one of the models failed to load during startup, shutdown the
-            # server gracefully
-            logger.exception("Some of the models failed to load during startup!")
-
-            # Explicitly cancel remaining tasks
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-
-            # Wait for cancellations to propagate
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # Keep the server tasks alive until stop() is called. Shielding
+            # ensures cancellation reaches this handler instead of cancelling
+            # the transport tasks directly.
+            await asyncio.shield(servers_task)
+        except (Exception, asyncio.CancelledError) as start_error:
+            if isinstance(start_error, asyncio.CancelledError):
+                if self._model_registry.is_startup_complete:
+                    logger.info("Server was cancelled. Shutting down")
+                else:
+                    logger.info("Server startup was cancelled. Shutting down")
+            elif self._model_registry.is_startup_complete:
+                logger.exception("A server task failed. Shutting down")
+            else:
+                logger.exception(
+                    "Some models failed to load during startup. Shutting down."
+                )
 
             try:
-                await self.stop()
-            except Exception:
-                # Log and supress stop error
-                logger.error(
-                    "Failed to stop server during startup cleanup", exc_info=True
-                )
+                # Explicitly cancel remaining tasks
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+
+                # Wait for model-operation cancellation to settle before stopping
+                # the resources those operations may be using.
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+                try:
+                    await self.stop()
+                except Exception:
+                    # Log and supress stop error
+                    logger.error(
+                        "Failed to stop server during startup cleanup",
+                        exc_info=True,
+                    )
+            finally:
+                await self._settle_server_tasks(server_tasks, servers_task)
+
             raise  # Re-raise to signal startup failure to caller
-        finally:
-            await servers_task
 
     async def add_custom_handlers(self, model: MLModel) -> MLModel:
         await self._rest_server.add_custom_handlers(model)
