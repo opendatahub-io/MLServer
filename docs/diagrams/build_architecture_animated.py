@@ -1,7 +1,7 @@
 """
 Build the animated MLServer Software Architecture diagram as a self-contained HTML file.
 
-Shows the internal component perspective: DataPlane, Middleware, Response Cache,
+Shows the internal component perspective: DataPlane, Middleware,
 Model Registry, Workers, Queues, and runtime plugins. Complements the deployment
 topology diagram which shows the K8s infrastructure perspective.
 
@@ -34,7 +34,6 @@ icons = {
     "cm": b64_img("cm.png"),
     "pvc": b64_img("pvc.png"),
     "prometheus": b64_img("prometheus.png"),
-    "kafka": b64_img("kafka.png"),
     "users": b64_img("users.png"),
     "storage": b64_img("storage.png"),
 }
@@ -175,16 +174,15 @@ html = f"""<!DOCTYPE html>
   <text x="575" y="32" fill="#222" font-size="20" font-weight="700"
     text-anchor="middle">MLServer — Software Architecture</text>
   <text x="575" y="50" fill="#666" font-size="11"
-    text-anchor="middle">V2 Inference Protocol  ·  REST + gRPC + Kafka</text>
+    text-anchor="middle">V2 Inference Protocol  ·  REST + gRPC</text>
 
   <!-- ═══════════════════════════════════════════════════════ -->
   <!--  EXTERNAL CLIENTS (left column)                        -->
   <!-- ═══════════════════════════════════════════════════════ -->
 
 {node("users", "Client", 80, 200, sublabel="Applications")}
-{node("kafka", "Kafka", 80, 380, sublabel="Message Bus")}
-{node("prometheus", "Prometheus", 80, 520, sublabel="Scrape /metrics")}
-{node("cm", "Security", 80, 650, sublabel="Trusted Runtimes")}
+{node("prometheus", "Prometheus", 80, 325, sublabel="Scrape /metrics")}
+{node("cm", "Security", 505, 370, sublabel="Trusted Runtimes")}
 
   <!-- ═══════════════════════════════════════════════════════ -->
   <!--  TRANSPORT LAYER                                       -->
@@ -196,18 +194,16 @@ html = f"""<!DOCTYPE html>
 {box("REST API", 195, 160, 160, 50, "#2E6EB5", ":8080 · HTTP/JSON")}
 {box("gRPC API", 195, 230, 160, 50, "#2E6EB5", ":8081 · HTTP/2+Protobuf")}
 {box("Metrics", 195, 300, 160, 50, "#D4880F", ":8082 · Prometheus")}
-{box("Kafka Consumer", 195, 370, 160, 50, "#7D3C98", "CloudEvents")}
 
   <!-- ═══════════════════════════════════════════════════════ -->
   <!--  CORE ENGINE                                           -->
   <!-- ═══════════════════════════════════════════════════════ -->
-  <rect x="405" y="120" width="200" height="300" class="cluster-solid"
+  <rect x="405" y="120" width="200" height="180" class="cluster-solid"
     fill="#4B9A1E" stroke="#4B9A1E"/>
   <text x="505" y="140" class="cluster-title" fill="#4B9A1E">Core Engine</text>
 
 {box("DataPlane", 425, 160, 160, 50, "#4B9A1E", "Inference Orchestration")}
 {box("Middleware", 425, 230, 160, 50, "#4B9A1E", "CloudEvents · Hooks")}
-{box("Response Cache", 425, 300, 160, 50, "#117A65", "LRU · Per-request key")}
 
   <!-- ═══════════════════════════════════════════════════════ -->
   <!--  MODEL MANAGEMENT                                      -->
@@ -263,27 +259,17 @@ html = f"""<!DOCTYPE html>
   <!-- gRPC → DataPlane (right then up) -->
 {arrow("M 357,255 L 390,255 L 390,190 L 423,190", "arrow-green", "flow-right", "ah-green")}
 
-  <!-- Kafka → Kafka Consumer (horizontal) -->
-{arrow("M 112,380 L 193,380", "arrow-purple", "flow-right", "ah-purple")}
-  <!-- Kafka Consumer → Middleware (right then up) -->
-{arrow("M 357,395 L 390,395 L 390,255 L 423,255", "arrow-purple", "flow-right", "ah-purple",
-       "CloudEvents", 390, 320)}
+  <!-- Prometheus → Metrics -->
+{arrow("M 112,325 L 193,325", "arrow-red", "flow-left", "ah-red",
+       "scrape", 152, 315)}
 
-  <!-- Prometheus → Metrics (right then up) -->
-{arrow("M 112,520 L 155,520 L 155,330 L 193,330", "arrow-red", "flow-left", "ah-red",
-       "scrape", 155, 430)}
-
-  <!-- Security → Middleware (right then up) -->
-{arrow("M 112,650 L 155,650 L 155,268 L 423,268", "arrow-red", "flow-right", "ah-red",
-       "allowlist", 155, 460)}
+  <!-- Security → Middleware -->
+{arrow("M 505,346 L 505,282", "arrow-red", "flow-up", "ah-red",
+       "allowlist", 555, 320)}
 
   <!-- DataPlane → Registry (horizontal) -->
 {arrow("M 587,185 L 653,185", "arrow-purple", "flow-right", "ah-purple",
        "resolve model", 620, 175)}
-
-  <!-- DataPlane → Response Cache (vertical) -->
-{arrow("M 505,212 L 505,298", "arrow-teal", "flow-down", "ah-teal",
-       "cache lookup", 545, 260)}
 
   <!-- DataPlane → Middleware (vertical) -->
 {arrow("M 505,212 L 505,228", "arrow-green", "flow-down", "ah-green")}

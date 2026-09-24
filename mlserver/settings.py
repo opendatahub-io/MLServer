@@ -491,12 +491,6 @@ class Settings(BaseSettings):
     logging_settings: str | dict | None = None
     """Path to logging config file or dictionary configuration."""
 
-    # Kafka Server settings
-    kafka_enabled: bool = False
-    kafka_servers: str = "localhost:9092"
-    kafka_topic_input: str = "mlserver-input"
-    kafka_topic_output: str = "mlserver-output"
-
     # OpenTelemetry Tracing settings
     tracing_server: str | None = None
     """Server name used to export OpenTelemetry tracing to collector service."""
@@ -505,12 +499,6 @@ class Settings(BaseSettings):
     _custom_rest_server_settings: dict | None = None
     _custom_metrics_server_settings: dict | None = None
     _custom_grpc_server_settings: dict | None = None
-
-    cache_enabled: bool = False
-    """Enable caching for the model predictions."""
-
-    cache_size: int = 100
-    """Cache size to be used if caching is enabled."""
 
     gzip_enabled: bool = True
     """Enable GZipMiddleware."""
@@ -797,8 +785,3 @@ class ModelSettings(BaseSettings):
     # However, it's also possible to override them manually.
     parameters: ModelParameters | None = None
     """Extra parameters for each instance of this model."""
-
-    cache_enabled: bool = False
-    """Enable caching for a specific model. This parameter can be used to disable
-    cache for a specific model, if the server level caching is enabled. If the
-    server level caching is disabled, this parameter value will have no effect."""

@@ -28,8 +28,7 @@
 MLServer is a Python-based inference server implementing the
 [V2 Inference Protocol](https://kserve.github.io/website/docs/concepts/architecture/data-plane/v2-protocol)
 (also known as the Open Inference Protocol). It serves ML models over REST
-(FastAPI/Uvicorn) and gRPC simultaneously, with optional Kafka message-bus
-integration and a dedicated Prometheus metrics endpoint.
+(FastAPI/Uvicorn) and gRPC simultaneously and a dedicated Prometheus metrics endpoint.
 
 Key architectural properties:
 
@@ -61,7 +60,6 @@ graph TB
     subgraph "External Actors"
         Client["Client Application"]
         Prometheus["Prometheus"]
-        KafkaBroker["Kafka Broker"]
         ModelStore["Model Artifact Store<br/>(filesystem / S3 / PVC)"]
     end
 
@@ -70,7 +68,6 @@ graph TB
         REST["REST Server<br/>(FastAPI + Uvicorn)<br/>:8080"]
         GRPC["gRPC Server<br/>(grpcio)<br/>:8081"]
         Metrics["Metrics Server<br/>(FastAPI + Uvicorn)<br/>:8082"]
-        Kafka["Kafka Server<br/>(aiokafka)"]
         DataPlane["DataPlane<br/>(inference orchestration)"]
         Registry["MultiModelRegistry<br/>(model lifecycle)"]
         Pool["InferencePoolRegistry<br/>(parallel workers)"]
@@ -79,12 +76,10 @@ graph TB
 
     Client -->|"HTTP/REST"| REST
     Client -->|"gRPC"| GRPC
-    KafkaBroker <-->|"consume / produce"| Kafka
     Prometheus -->|"scrape /metrics"| Metrics
 
     REST --> DataPlane
     GRPC --> DataPlane
-    Kafka --> DataPlane
     DataPlane --> Registry
     Registry --> Pool
     Registry --> Batcher
@@ -95,8 +90,8 @@ graph TB
     classDef external fill:#F5A623,stroke:#C47D1A,color:#fff
     classDef core fill:#7ED321,stroke:#5A9A18,color:#fff
 
-    class REST,GRPC,Metrics,Kafka server
-    class Client,Prometheus,KafkaBroker,ModelStore external
+    class REST,GRPC,Metrics
+    class Client,Prometheus,ModelStore external
     class DataPlane,Registry,Pool,Batcher core
 ```
 
@@ -114,7 +109,6 @@ classDiagram
         -Settings _settings
         -RESTServer _rest_server
         -GRPCServer _grpc_server
-        -KafkaServer _kafka_server
         -MetricsServer _metrics_server
         -MultiModelRegistry _model_registry
         -InferencePoolRegistry _inference_pool_registry
@@ -133,9 +127,7 @@ classDiagram
         +int http_port
         +int grpc_port
         +int metrics_port
-        +bool kafka_enabled
         +str metrics_endpoint
-        +bool cache_enabled
         +bool strict_readiness
         +bool empty_registry_readiness
         +str log_level
@@ -195,7 +187,6 @@ classDiagram
     class DataPlane {
         -Settings _settings
         -MultiModelRegistry _model_registry
-        -ResponseCache _response_cache
         -InferenceMiddlewares _inference_middleware
         +live() bool
         +ready() bool
@@ -263,7 +254,6 @@ sequenceDiagram
     participant GRPC as gRPC<br/>(InferenceServicer)
     participant DP as DataPlane
     participant MW as InferenceMiddlewares<br/>(CloudEvents)
-    participant Cache as ResponseCache
     participant Reg as MultiModelRegistry
     participant Model as MLModel<br/>(runtime plugin)
 
@@ -290,19 +280,8 @@ sequenceDiagram
     DP->>MW: request_middleware(payload, settings)
     MW-->>DP: processed payload
 
-    alt Cache enabled
-        DP->>Cache: lookup(cache_key)
-        alt Cache hit
-            Cache-->>DP: cached InferenceResponse
-        else Cache miss
-            DP->>Model: predict(payload)
-            Model-->>DP: InferenceResponse
-            DP->>Cache: insert(key, response)
-        end
-    else Cache disabled
-        DP->>Model: predict(payload)
-        Model-->>DP: InferenceResponse
-    end
+    DP->>Model: predict(payload)
+    Model-->>DP: InferenceResponse
 
     DP->>MW: response_middleware(response, settings)
     MW-->>DP: processed response
@@ -751,16 +730,12 @@ flowchart LR
 
         DP --> REST_S["RESTServer"]
         DP --> GRPC_S["GRPCServer"]
-
-        S --> K_CHECK{"kafka_enabled?"}
-        K_CHECK -->|"Yes"| KAFKA_S["KafkaServer"]
-        K_CHECK -->|"No"| SKIP_K["Skip Kafka"]
     end
 
     subgraph "MLServer.start()"
         direction TB
         SEC["Validate runtime security"]
-        SEC --> START_ALL["asyncio.gather:<br/>REST.start()<br/>gRPC.start()<br/>Metrics.start()<br/>Kafka.start()"]
+        SEC --> START_ALL["asyncio.gather:<br/>REST.start()<br/>gRPC.start()<br/>Metrics.start()"]
         START_ALL --> LOAD["Load initial models<br/>from repository"]
         LOAD --> READY["startup_complete()"]
     end
@@ -780,10 +755,9 @@ flowchart LR
 ### Shutdown Sequence
 
 1. Close `InferencePoolRegistry` (stop all worker processes).
-2. Stop `KafkaServer` (consumer + producer).
-3. Stop `GRPCServer`.
-4. Stop `RESTServer`.
-5. Stop `MetricsServer`.
+2. Stop `GRPCServer`.
+3. Stop `RESTServer`.
+4. Stop `MetricsServer`.
 
 ---
 
@@ -810,8 +784,6 @@ variables, `.env` files, and JSON configuration files.
 | `max_batch_time` | 0.0 | Adaptive batching time window in seconds |
 | `strict_readiness` | true | All models must be ready vs. at least one |
 | `empty_registry_readiness` | true | Report ready when no models loaded |
-| `cache_enabled` | false | Enable response caching |
-| `cache_size` | 100 | LRU cache size |
 
 ---
 

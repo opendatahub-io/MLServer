@@ -27,12 +27,10 @@ MLServer/
 │   ├── handlers/            # DataPlane + ModelRepositoryHandlers
 │   ├── rest/                # FastAPI REST transport
 │   ├── grpc/                # gRPC transport + protobuf converters
-│   ├── kafka/               # Kafka message-bus transport
 │   ├── metrics/             # Prometheus metrics server
 │   ├── parallel/            # Multiprocessing worker pool
 │   ├── batching/            # Adaptive request batching
 │   ├── codecs/              # V2 ↔ Python type conversion
-│   ├── cache/               # Response caching
 │   ├── types/               # V2 Inference Protocol type definitions
 │   ├── middleware.py         # Inference middleware chain
 │   ├── cloudevents.py        # CloudEvents middleware
@@ -105,7 +103,7 @@ must return an `InferenceResponse` with the same structure.
 ### The DataPlane
 
 The `DataPlane` class is the single implementation of inference logic, shared
-by REST, gRPC, and Kafka transports. Transport servers are thin adapters
+by REST and gRPC transports. Transport servers are thin adapters
 that convert wire formats and delegate to the DataPlane.
 
 ### Registry Hooks

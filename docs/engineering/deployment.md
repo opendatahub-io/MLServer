@@ -250,24 +250,6 @@ MLServer instruments FastAPI with OpenTelemetry, excluding health-check endpoint
 
 ---
 
-## Response Caching
-
-Enable caching to avoid redundant inference for repeated inputs:
-
-```json
-{
-  "cache_enabled": true,
-  "cache_size": 100
-}
-```
-
-- Cache is an in-memory LRU cache keyed on the serialized `InferenceRequest`
-- Individual models can opt out by setting `cache_enabled: false` in `model-settings.json`
-- Cache is not shared across parallel workers
-- Streaming inference responses are not cached
-
----
-
 ## Environment Variables Reference
 
 All `settings.json` fields can be set via environment variables:
@@ -289,16 +271,6 @@ MLSERVER_LOAD_MODELS_AT_STARTUP=true
 # Parallel inference
 MLSERVER_PARALLEL_WORKERS=1
 MLSERVER_PARALLEL_WORKERS_TIMEOUT=5
-
-# Caching
-MLSERVER_CACHE_ENABLED=false
-MLSERVER_CACHE_SIZE=100
-
-# Kafka
-MLSERVER_KAFKA_ENABLED=false
-MLSERVER_KAFKA_SERVERS=localhost:9092
-MLSERVER_KAFKA_TOPIC_INPUT=mlserver-input
-MLSERVER_KAFKA_TOPIC_OUTPUT=mlserver-output
 
 # Tracing
 MLSERVER_TRACING_SERVER=jaeger:4317
