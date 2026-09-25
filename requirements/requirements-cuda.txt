@@ -90,17 +90,17 @@ ml-dtypes==0.6.0 \
     --hash=sha256:d0f6f8cad19330199ebf73fe5dcff4ead5b833731f450b153e6f32b7d8e563d5 \
     --hash=sha256:efa30da126bb5b18a12e3cfa1adc532a17016370a3aa252502e072ab7fee44c4
 
-multidict==6.8.0 \
-    --hash=sha256:70ec0c6ec3ccd21d98b7f66f31748ad8502a7d16b2c1201740488489dac0729e \
-    --hash=sha256:86e7fe9444be8a389c56243ed97cc19546e0d0c92634431c8b408156d43845d7
+multidict==6.9.1 \
+    --hash=sha256:67101650e0235bcb468ddb84600d45ef2ca3152af69cfdceed00d7c818ed36b5 \
+    --hash=sha256:beb0ff913eeb7bde10e540bfca237520758a9ecb498a188aebd54524649d17c3
 
 numpy==2.5.3 \
     --hash=sha256:4eb96a7823fccf743f6467d350e8a00e0651fb84cb509a7cb223d92fed16393c \
     --hash=sha256:6ae1c9a57bae2b9f66bdb0c41136774680d51ef629fd3f76fd4d5ecbd39cb816
 
-onnx==1.22.0 \
-    --hash=sha256:65fac382c2ceecb20f390cc0fe8b08d5c4c983d5d28bc8ac4ee70559891c63e9 \
-    --hash=sha256:c822c80e15bea16704b74f5b357bf6e92b016690ece295eadb8f96ae9fa1b155
+onnx==1.23.0 \
+    --hash=sha256:251b9eb202b3c5cb2dedbc64ed916078ded5890e452e97de66537f039513acb9 \
+    --hash=sha256:d6eba92ac819a21cc18fa143e55edf1ad7effc9310bafe293f4d00dacad3c68e
 
 onnxruntime-gpu==1.25.0 \
     --hash=sha256:9288e5ee609646739751650e59276e2b57ee6d18474d53f8cbcc5d1a4d3a632f \
