@@ -87,8 +87,8 @@ geventhttpclient==2.3.9 \
     --hash=sha256:6d57c0f8d1d2bb9d81fc6acaa8f96d1a9a4ae413d0569ab4c084a02b1e92ae35 \
     --hash=sha256:c04686788e7adddcfb5336e6141dc88652d0257f0629936efb279bbf35044ef4
 
-googleapis-common-protos==1.75.3 \
-    --hash=sha256:03ee98a59092216cd75fd259fa9cd7ddb46db1c654e0416a9e70c5ff8dcb3516
+googleapis-common-protos==1.75.4 \
+    --hash=sha256:5066f5846b4049366464ef0f6b1dac8b1de8f8a3cf30947f40c55937754e0e45
 
 greenlet==3.5.6 \
     --hash=sha256:20c99479e87b23ffba935ca36ff0f026ebaecee5ac0f545f917bd5c235845c36 \
@@ -119,10 +119,10 @@ ml-dtypes==0.6.0 \
     --hash=sha256:b7896bed9fbfcffb16a74201844fa73aa4a187d1f3b2ad9308849f21e7d0d038 \
     --hash=sha256:e1c2f57508394f63a46f13dc062ee9a2f8814eaae326c27c680e3b2499ada46b
 
-multidict==6.8.0 \
-    --hash=sha256:1e466df16f61a01a7a4b9e3ca14113e4456ca8c2600ba7b0ba6c6947030117fa \
-    --hash=sha256:450448cdc07bd998f8b5f0d2a42d92bb9289d4a8fe35a2569f4451d4318edf97 \
-    --hash=sha256:7f6ca8546357e3f6728f483fa758b69bac117a76e3c6fcaad1405f2116cafae7
+multidict==6.9.1 \
+    --hash=sha256:4b86b07b6fc0455d4604222fd7d0c2c72ba60bf9555eded00a540bcba664065f \
+    --hash=sha256:d3524e3f9269bc074fa5b39fb2f67535822fc0df5a13ee77992d24221c6816ad \
+    --hash=sha256:e03ac1985b3e85c92159d64dc1f9f4fd84cc8345dfe841517e52e36ddcb54a84
 
 narwhals==2.26.0 \
     --hash=sha256:ad664683a0e573e1a3666bf87c2a878a94f032cb63834a870989e9ca271d579f
@@ -132,48 +132,51 @@ numpy==2.5.3 \
     --hash=sha256:cee9ea66a9881e777e811ee0b464ef1c80222d4dedef37c03b8b75d547dc7777 \
     --hash=sha256:f1bc5ed81669c0cfbadd178ef509f47d489ca9cf36255e9cfc9678aaa6c2532e
 
-onnx==1.22.0 \
-    --hash=sha256:5767995779ddf0c01c39b274d3736559bb34d5bb255edd3863f50aa6738f834a \
-    --hash=sha256:8e43a4d7ca3672e38d1ea08bd2491b5c4ebda35c64856c34a7591595337fd1a8 \
-    --hash=sha256:9c922aed1922ebbe8d7e267e238f4e7c84a210ee163ca706a1ce9689e8ebc684
+onnx==1.23.0 \
+    --hash=sha256:2896ffe899903a8ba55c54be62319cc6a5d869562d694f46bd4db28321db08b9 \
+    --hash=sha256:70e51ae9a35172fa4018752ef185cac107c0afcd395b4bb8087ac0fdd643a12b \
+    --hash=sha256:daf7b02e2ef74509a2bbadbf88328632a04ea492da4ccf9d2815efc5a60dab2c
 
 onnxruntime==1.25.0 \
     --hash=sha256:b07e318ac11a6aed1e96004c7870351d390484e3e19d83fd85b78b18a42faebb \
     --hash=sha256:cef48b2d4263ae900ad3daa70d2262ca4c058658f5564db7d9cfd7f5f908cbc4 \
     --hash=sha256:eeee14eaff8ff09d7ef95f8d65f54775ae0da28889cffab73af4e0ca49c61ecd
 
-opentelemetry-api==1.44.0 \
-    --hash=sha256:b1e0c91a2b18caba1bef91686bfa26bf8157d04c06bd36dc4c782093fe9a70f2
+opentelemetry-api==1.45.0 \
+    --hash=sha256:27455178e17443d07512941ba23d7743452978a08c506966de80012b9e44adc7
 
-opentelemetry-exporter-otlp-proto-common==1.44.0 \
-    --hash=sha256:5316ede2e57cb879a359799308950e9354feac93783f85c4be32528832e58d68
+opentelemetry-exporter-otlp-common==0.66b0 \
+    --hash=sha256:2ae01c830d01a865be4fe0ee611ce6fdbc42e2800ea5fa6b09e962c45bbf9ab6
 
-opentelemetry-exporter-otlp-proto-grpc==1.44.0 \
-    --hash=sha256:76da4855ce7411dc4c3f83f05716a3a86a480a2578697b88d9d58187a44831cb
+opentelemetry-exporter-otlp-proto-common==1.45.0 \
+    --hash=sha256:59dd6db06bf3bbf147def84e2704fa3d85f8f4240d61592461d8a40fab0d8050
 
-opentelemetry-instrumentation==0.65b0 \
-    --hash=sha256:b2a6c3d841b800679d02c1e73cd3716793fd0b03f2c2c4753426311c4f9061cd
+opentelemetry-exporter-otlp-proto-grpc==1.45.0 \
+    --hash=sha256:b09f1241f353b9857eeeaf6d8f38b53367fcb62a231c895aa93c666f78ffec73
 
-opentelemetry-instrumentation-asgi==0.65b0 \
-    --hash=sha256:8067973cf705947950903fdc35af03e4aba67a7aa56d72b60b86316d43667d11
+opentelemetry-instrumentation==0.66b0 \
+    --hash=sha256:d70fc08657a96828d1f343018acb6a7620ccaea657248f0f9f155fc1f41a39e6
 
-opentelemetry-instrumentation-fastapi==0.65b0 \
-    --hash=sha256:c6343997729534080ed6b6779ed19dbcc068e5f7662a363bc98a5893d6b4657a
+opentelemetry-instrumentation-asgi==0.66b0 \
+    --hash=sha256:71232a95dc914243bbc11e12579af4df28d4d51a545693b053e1a4f4623d627f
 
-opentelemetry-instrumentation-grpc==0.65b0 \
-    --hash=sha256:d0f154b61aec27ff7ab798cb71aa407bef222c13ee556e15a144add8f11457b5
+opentelemetry-instrumentation-fastapi==0.66b0 \
+    --hash=sha256:340cb54ec3c9b777496d0a010e82dbe386b6dcde0d7f6da33e5b5da8e30d7b61
 
-opentelemetry-proto==1.44.0 \
-    --hash=sha256:4793d7dadde34e2bbad93b696323c56b1e4c23c01e9fb112ce2e3e5c47518acb
+opentelemetry-instrumentation-grpc==0.66b0 \
+    --hash=sha256:1c78d5954110cbc5bb3cc651e3e1827c3d4e7cb10d2dcf6d1573e7e10c07c384
 
-opentelemetry-sdk==1.44.0 \
-    --hash=sha256:1b7068c20840ea93e14b9986b97ae9d71bf8002c9fe08cb6998f7932097c6954
+opentelemetry-proto==1.45.0 \
+    --hash=sha256:7473c2c6efa9dcd18afdf3c7a24f1d0181b5a24fa41f49c560c1878190fb4759
 
-opentelemetry-semantic-conventions==0.65b0 \
-    --hash=sha256:c86476a49cb604effbb77baa7340f231023a5008ee4e45a3872ef620ceb613ca
+opentelemetry-sdk==1.45.0 \
+    --hash=sha256:aa91727bb8e7b2f5f40e54dfc02bd21bffd977fa6cfc3806d64a8364c799a79e
 
-opentelemetry-util-http==0.65b0 \
-    --hash=sha256:31d76112404e37fe34246a07de95935a21fd4104606be46ad3fe3607bf950455
+opentelemetry-semantic-conventions==0.66b0 \
+    --hash=sha256:a833aaa68b68fce661cdb341107c6f0c44bc3d3e98902a42a1ac359528959dd6
+
+opentelemetry-util-http==0.66b0 \
+    --hash=sha256:0c17565026ca8aff6429e4d8ff05012a94bca565ef4e0bb81d866fc1b59bdd19
 
 orjson==3.12.0 \
     --hash=sha256:332fc40ae168238c62d53afe1eaa4ad1f12b3bd899badc1bc3dd8784189be456 \
@@ -245,8 +248,8 @@ setuptools==84.0.0 \
 six==1.17.0 \
     --hash=sha256:4ac1ae5b7234d760dcb9e8e011b1e5b30a8a6917b8cf42dd82ded8d124124325
 
-starlette==1.6.0 \
-    --hash=sha256:93f2fe3cf201bf2eda7aa64cc09a24c4005fbd7898d58cf66b792f3f74e2e84b
+starlette==1.7.0 \
+    --hash=sha256:366c835e7929c9793d0b9ba79ba0aba3eb7621036c1d9bd6d2030ef068fe2270
 
 starlette-exporter==0.24.0 \
     --hash=sha256:4bc36ea70796fd62edcfc4c4733a6b7c1357dbae2621c3b50f3e7ca9b8b80eb2
@@ -266,8 +269,8 @@ typing-inspection==0.4.4 \
 urllib3==2.8.0 \
     --hash=sha256:8e848363a04c91d0bb9a6e60889c6a1a8dd4b646480bb5880982496e79ad6e22
 
-uvicorn==0.53.0 \
-    --hash=sha256:b6cd1f113e1d2c1b57405f023f82a8c5483588f2007d43d267a1f0083bec2d14
+uvicorn==0.54.0 \
+    --hash=sha256:4f65bb0ffad4be34b2baa5059595b0e099fdc99667a94c6927415ca9491f23d3
 
 uvloop==0.22.1 \
     --hash=sha256:17f5277384c9475159977d7efc71f9e0ff327587a317168f99c1d696094b0491 \
