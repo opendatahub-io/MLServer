@@ -1,5 +1,6 @@
 import time
 import asyncio
+from contextvars import ContextVar
 
 from asyncio import Future, Queue, wait_for, Task
 from functools import partial, wraps
@@ -20,6 +21,9 @@ from .. import metrics
 from .requests import BatchedRequests
 
 _AdaptiveBatchingAttr = "__adaptive_batching__"
+_BypassAdaptiveBatchingForStreaming = ContextVar(
+    "bypass_adaptive_batching_for_streaming", default=False
+)
 
 
 class InvalidBatchingMethod(MLServerError):
@@ -71,8 +75,8 @@ class AdaptiveBatcher:
                 pass
 
         # Remove instance overrides so the model's class methods are visible again
-        delattr(self._model, "predict")
-        delattr(self._model, "predict_stream")
+        setattr(self._model, "predict", self._predict_fn)
+        setattr(self._model, "predict_stream", self._predict_stream_fn)
 
         # Remove batcher from model to break reference cycle
         delattr(self._model, _AdaptiveBatchingAttr)
@@ -117,7 +121,7 @@ class AdaptiveBatcher:
             response = await async_response
             return response
         finally:
-            del self._async_responses[internal_id]
+            self._async_responses.pop(internal_id, None)
 
     def _start_batcher_if_needed(self):
         if self._batching_task is not None:
@@ -167,10 +171,14 @@ class AdaptiveBatcher:
             batched_response = predict_task.result()
             responses = batched.split_response(batched_response)
             for internal_id, response in responses.items():
-                self._async_responses[internal_id].set_result(response)
+                future = self._async_responses.get(internal_id)
+                if future is not None and not future.done():
+                    future.set_result(response)
         except Exception as err:
             for internal_id in batched.inference_requests.keys():
-                self._async_responses[internal_id].set_exception(err)
+                future = self._async_responses.get(internal_id)
+                if future is not None and not future.done():
+                    future.set_exception(err)
 
     async def _batch_requests(self) -> AsyncIterator[BatchedRequests]:
         while not self._requests.empty():
@@ -183,6 +191,11 @@ class AdaptiveBatcher:
                     internal_id, inference_request = await self._get_request(
                         timeout=timeout
                     )
+
+                    future = self._async_responses.get(internal_id)
+                    if future is None or future.done():
+                        continue
+
                     to_batch[internal_id] = inference_request
 
                     # Update remaining timeout
@@ -192,7 +205,8 @@ class AdaptiveBatcher:
                 # NOTE: Hit timeout, continue
                 pass
 
-            yield BatchedRequests(to_batch)
+            if to_batch:
+                yield BatchedRequests(to_batch)
 
     async def _get_request(self, timeout: float) -> tuple[str, InferenceRequest]:
         if not self._requests.empty():
@@ -210,6 +224,9 @@ def adaptive_batching(f: Callable[[InferenceRequest], Awaitable[InferenceRespons
 
     @wraps(f)
     async def _inner(payload: InferenceRequest) -> InferenceResponse:
+        if _BypassAdaptiveBatchingForStreaming.get():
+            return await f(payload)
+
         batcher = _get_batcher(f)
         return await batcher.predict(payload)
 
@@ -234,8 +251,22 @@ def not_implemented_warning(
     async def _inner_stream(
         payload: AsyncIterator[InferenceRequest],
     ) -> AsyncIterator[InferenceResponse]:
-        async for response in f(payload):
-            yield response
+        stream = aiter(f(payload))
+        try:
+            while True:
+                token = _BypassAdaptiveBatchingForStreaming.set(True)
+                try:
+                    response = await anext(stream)
+                except StopAsyncIteration:
+                    return
+                finally:
+                    _BypassAdaptiveBatchingForStreaming.reset(token)
+
+                yield response
+        finally:
+            aclose = getattr(stream, "aclose", None)
+            if aclose is not None:
+                await aclose()
 
     return _inner_stream
 
