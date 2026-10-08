@@ -56,6 +56,7 @@ class MLServer:
         self._configure_logger()
         self._create_servers()
 
+    # Triggering CI tests
     def _create_model_registry(self) -> MultiModelRegistry:
         on_model_load = [
             self.add_custom_handlers,
