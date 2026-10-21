@@ -325,12 +325,22 @@ def test_inferoutputtensor_from_types(
     assert infer_output_tensor == expected
 
 
-def test_repositoryindexrequest_to_types(grpc_repository_index_request):
+@pytest.mark.parametrize("include_registry_models", [False, True])
+@pytest.mark.parametrize("ready", [False, True])
+def test_repositoryindexrequest_to_types(
+    grpc_repository_index_request, include_registry_models, ready
+):
+    grpc_repository_index_request.ready = ready
+    grpc_repository_index_request.include_registry_models = include_registry_models
     repository_index_request = RepositoryIndexRequestConverter.to_types(
         grpc_repository_index_request
     )
 
     assert repository_index_request.ready == grpc_repository_index_request.ready
+    assert (
+        repository_index_request.include_registry_models
+        == grpc_repository_index_request.include_registry_models
+    )
 
 
 def test_repositoryindexresponse_from_types(repository_index_response):
