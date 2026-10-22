@@ -1,6 +1,10 @@
-import pytest
-
+import asyncio
+from collections.abc import AsyncIterator
+from copy import deepcopy
+from types import MethodType
 from unittest.mock import MagicMock
+
+import pytest
 
 from mlserver.model import MLModel
 from mlserver.parallel.model import ParallelModel
@@ -38,6 +42,90 @@ async def test_batching_predict_stream(
     assert isinstance(responses[0], InferenceResponse)
     assert len(responses[0].outputs) == 1
     assert "not supported for inference streaming" in caplog.records[0].message
+
+
+async def test_batching_default_predict_stream_bypasses_batcher(
+    text_model: MLModel, generate_request: InferenceRequest, mocker
+):
+    text_model.settings.max_batch_size = 10
+    text_model.settings.max_batch_time = 0.4
+    await load_batching(text_model)
+
+    batcher = AdaptiveBatcher.get_batcher(text_model)
+    assert batcher is not None
+    predict_mock = mocker.patch.object(
+        batcher,
+        "predict",
+        wraps=batcher.predict,
+    )
+
+    async def get_stream_request(request):
+        yield request
+
+    stream = text_model.predict_stream(get_stream_request(generate_request))
+    try:
+        response = await anext(stream)
+
+        assert len(response.outputs) == 1
+        predict_mock.assert_not_awaited()
+
+        await text_model.predict(generate_request)
+        predict_mock.assert_awaited_once_with(generate_request)
+    finally:
+        aclose = getattr(stream, "aclose", None)
+        if aclose is not None:
+            await aclose()
+
+    assert not batcher._async_responses
+
+
+async def test_streaming_bypass_is_limited_to_stream_task(
+    text_model: MLModel, generate_request: InferenceRequest, mocker
+):
+    """Streaming cleanup bypasses batching, but inherited child contexts do not."""
+    text_model.settings.max_batch_size = 10
+    text_model.settings.max_batch_time = 0.05
+
+    child_released = asyncio.Event()
+
+    async def custom_stream(
+        self, payload: AsyncIterator[InferenceRequest]
+    ) -> AsyncIterator[InferenceResponse]:
+        async def child_predict():
+            await child_released.wait()
+            await self.predict(generate_request)
+
+        child_task = asyncio.create_task(child_predict())
+        try:
+            yield await self.predict(generate_request)
+        finally:
+            # This call is made from aclose() and remains in the streaming
+            # bypass scope.
+            await self.predict(generate_request)
+            child_released.set()
+            await child_task
+
+    setattr(text_model, "predict_stream", MethodType(custom_stream, text_model))
+    await load_batching(text_model)
+
+    batcher = AdaptiveBatcher.get_batcher(text_model)
+    assert batcher is not None
+    predict_mock = mocker.patch.object(batcher, "predict", wraps=batcher.predict)
+
+    async def stream_requests() -> AsyncIterator[InferenceRequest]:
+        yield generate_request
+
+    stream = text_model.predict_stream(stream_requests())
+    try:
+        await anext(stream)
+    finally:
+        aclose = getattr(stream, "aclose", None)
+        if aclose is not None:
+            await aclose()
+
+    # Only the child task should enter the batcher. The generator's cleanup
+    # runs in the stream task and is still covered by the bypass.
+    predict_mock.assert_awaited_once_with(generate_request)
 
 
 @pytest.mark.parametrize(
@@ -110,16 +198,75 @@ async def test_unload_batching_restores_predict_and_predict_stream_methods(
     assert AdaptiveBatcher.get_batcher(sum_model) is None
 
 
-async def test_load_batching_noop_for_parallel_model(sum_model: MLModel):
-    """load_batching must be a no-op for ParallelModel — batching is
-    installed on workers, not the main process."""
+async def test_load_batching_for_parallel_model(sum_model: MLModel):
+    """load_batching is installed on the main-process ParallelModel."""
     sum_model.settings.max_batch_size = 10
     sum_model.settings.max_batch_time = 0.4
 
     parallel_model = ParallelModel(sum_model, MagicMock())
-    original_predict = parallel_model.predict
-
     await load_batching(parallel_model)
 
-    assert parallel_model.predict == original_predict
-    assert AdaptiveBatcher.get_batcher(parallel_model) is None
+    assert AdaptiveBatcher.get_batcher(parallel_model) is not None
+
+
+async def test_parallel_registry_batches_per_model_and_maps_responses(
+    mlserver, sum_model_settings, inference_request: InferenceRequest, mocker
+):
+    """The server registry batches requests before dispatching them to workers."""
+    settings_by_model = []
+    for name in ("batched-model-a", "batched-model-b"):
+        settings = deepcopy(sum_model_settings)
+        settings.name = name
+        settings.max_batch_size = 2
+        settings.max_batch_time = 0.2
+        settings_by_model.append(settings)
+
+    models = []
+
+    try:
+        for settings in settings_by_model:
+            models.append(await mlserver._model_registry.load(settings))
+
+        batchers = [AdaptiveBatcher.get_batcher(model) for model in models]
+        assert all(batchers)
+        dispatch_spies = [
+            mocker.patch.object(batcher, "_predict_fn", wraps=batcher._predict_fn)
+            for batcher in batchers
+            if batcher is not None
+        ]
+
+        requests = []
+        for model in models:
+            requests.append(
+                [
+                    inference_request.copy(
+                        deep=True,
+                        update={"id": f"{model.name}-{index}"},
+                    )
+                    for index in range(2)
+                ]
+            )
+
+        responses = await asyncio.gather(
+            *[
+                model.predict(request)
+                for model, model_requests in zip(models, requests)
+                for request in model_requests
+            ]
+        )
+
+        assert [response.id for response in responses] == [
+            request.id for model_requests in requests for request in model_requests
+        ]
+        assert [response.model_name for response in responses] == [
+            model.name
+            for model_requests, model in zip(requests, models)
+            for _ in model_requests
+        ]
+        for dispatch_spy in dispatch_spies:
+            dispatch_spy.assert_awaited_once()
+            merged_request = dispatch_spy.await_args.args[0]
+            assert merged_request.inputs[0].shape[0] == 2
+    finally:
+        for model in models:
+            await mlserver._model_registry.unload(model.name)

@@ -1,7 +1,9 @@
 import asyncio
 import pytest
 
+from mlserver.batching import adaptive as adaptive_module
 from mlserver.batching.adaptive import AdaptiveBatcher
+from mlserver.batching.requests import BatchedRequests
 from mlserver.batching.shape import Shape
 from mlserver.types import InferenceRequest, RequestInput
 from mlserver.model import MLModel
@@ -97,6 +99,108 @@ async def test_batcher_propagates_errors(
             await adaptive_batcher._async_responses[internal_id]
 
         assert str(err.value) == message
+
+
+async def test_batcher_ignores_cancelled_response(
+    adaptive_batcher: AdaptiveBatcher,
+    send_request: RequestSender,
+    sum_model: MLModel,
+):
+    cancelled_id, cancelled_request = await send_request()
+    active_id, active_request = await send_request()
+
+    # Model the state left by a caller cancelling predict() while waiting.
+    adaptive_batcher._async_responses.pop(cancelled_id)
+    batched = BatchedRequests(
+        {
+            cancelled_id: cancelled_request,
+            active_id: active_request,
+        }
+    )
+    prediction = asyncio.create_task(sum_model.predict(batched.merged_request))
+    await prediction
+
+    adaptive_batcher._predict_callback(batched, prediction)
+
+    response = await adaptive_batcher._async_responses[active_id]
+    assert response.id == active_request.id
+
+
+async def test_batch_requests_skips_cancelled_request(
+    adaptive_batcher: AdaptiveBatcher,
+    send_request: RequestSender,
+):
+    internal_id, _ = await send_request()
+    adaptive_batcher._async_responses[internal_id].cancel()
+
+    batched_requests = [
+        batched_req async for batched_req in adaptive_batcher._batch_requests()
+    ]
+
+    assert batched_requests == []
+
+
+async def test_batch_requests_timeout_includes_cancelled_requests(
+    adaptive_batcher: AdaptiveBatcher,
+    send_request: RequestSender,
+    mocker,
+):
+    """Cancelled requests must not extend the deadline for live requests."""
+    adaptive_batcher._max_batch_size = 10
+    adaptive_batcher._max_batch_time = 0.1
+
+    requests = [await send_request() for _ in range(4)]
+    for internal_id, _ in requests[1:]:
+        adaptive_batcher._async_responses[internal_id].cancel()
+
+    observed_timeouts = []
+
+    async def get_request(timeout):
+        observed_timeouts.append(timeout)
+        return adaptive_batcher._requests.get_nowait()
+
+    # Control the queue reads and monotonic clock so this test does not depend
+    # on event-loop scheduling or wall-clock timing.
+    mocker.patch.object(adaptive_batcher, "_get_request", side_effect=get_request)
+    mocker.patch.object(
+        adaptive_module.time,
+        "monotonic",
+        side_effect=[0.0, 0.0, 0.08, 0.08, 0.08, 0.1],
+    )
+
+    batch = await anext(adaptive_batcher._batch_requests())
+
+    assert len(batch.inference_requests) == 1
+    assert batch.inference_requests[requests[0][0]] == requests[0][1]
+    assert observed_timeouts == pytest.approx([0.1, 0.02, 0.02, 0.02])
+
+
+async def test_batch_requests_drains_available_request_at_deadline(
+    adaptive_batcher: AdaptiveBatcher,
+    send_request: RequestSender,
+    mocker,
+):
+    """An expired deadline must not leave available requests undrained."""
+    adaptive_batcher._max_batch_size = 10
+    adaptive_batcher._max_batch_time = 0.1
+    internal_id, request = await send_request()
+    observed_timeouts = []
+
+    async def get_request(timeout):
+        observed_timeouts.append(timeout)
+        return adaptive_batcher._requests.get_nowait()
+
+    mocker.patch.object(adaptive_batcher, "_get_request", side_effect=get_request)
+    mocker.patch.object(
+        adaptive_module.time,
+        "monotonic",
+        side_effect=[0.0, 0.1, 0.1],
+    )
+
+    batch = await anext(adaptive_batcher._batch_requests())
+
+    assert batch.inference_requests == {internal_id: request}
+    assert observed_timeouts == pytest.approx([0.0])
 
 
 async def test_batcher_cancels_responses(
