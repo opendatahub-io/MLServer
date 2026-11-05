@@ -2,7 +2,7 @@
 name = "mlserver"
 version = "1.7.0.dev0"
 description = "MLServer"
-authors = ["Seldon Technologies Ltd. <hello@seldon.io>"]
+authors = ["Seldon Technologies Ltd. <hello@seldon.io>", "The KServe Authors"]
 license = "Apache-2.0"
 readme = "README.md"
 classifiers = [
