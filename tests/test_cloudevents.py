@@ -7,6 +7,7 @@ from mlserver.cloudevents import (
     CloudEventsTypes,
     CLOUDEVENTS_HEADER_MODEL_ID,
     CLOUDEVENTS_HEADER_TYPE,
+    CLOUDEVENTS_HEADER_SOURCE,
 )
 
 
@@ -51,3 +52,33 @@ def test_response_headers(
     assert headers[CLOUDEVENTS_HEADER_MODEL_ID] == sum_model_settings.name
     assert CLOUDEVENTS_HEADER_TYPE in headers
     assert headers[CLOUDEVENTS_HEADER_TYPE] == CloudEventsTypes.Response.value
+
+
+def test_custom_cloudevents_namespace(
+    inference_request: InferenceRequest,
+    sum_model_settings: ModelSettings,
+):
+    """Test that custom CloudEvents namespace is used when configured."""
+    custom_settings = Settings(
+        server_name="test-server", cloudevents_namespace="io.kserve.serving"
+    )
+    middleware = CloudEventsMiddleware(settings=custom_settings)
+
+    request_with_headers = middleware.request_middleware(
+        inference_request, sum_model_settings
+    )
+
+    assert request_with_headers.parameters is not None
+    assert request_with_headers.parameters.headers is not None
+
+    headers = request_with_headers.parameters.headers
+
+    # Verify custom namespace is used in Ce-Type
+    assert CLOUDEVENTS_HEADER_TYPE in headers
+    assert headers[CLOUDEVENTS_HEADER_TYPE] == "io.kserve.serving.inference.request"
+
+    # Verify custom namespace is used in Ce-Source
+    assert CLOUDEVENTS_HEADER_SOURCE in headers
+    assert (
+        headers[CLOUDEVENTS_HEADER_SOURCE] == "io.kserve.serving.deployment.test-server"
+    )
