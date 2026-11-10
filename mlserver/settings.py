@@ -455,6 +455,14 @@ class Settings(BaseSettings):
     extensions: list[str] = []
     """Server extensions loaded."""
 
+    cloudevents_namespace: str = "io.seldon.serving"
+    """
+    CloudEvents namespace prefix for event types and sources.
+    Default is 'io.seldon.serving' for backward compatibility.
+    Event types will be: {namespace}.inference.request/response
+    Event sources will be: {namespace}.deployment.{server_name}
+    """
+
     # HTTP Server settings
     host: str = "0.0.0.0"
     """Host where to listen for connections."""

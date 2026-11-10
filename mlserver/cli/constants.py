@@ -1,4 +1,4 @@
-DefaultBaseImage = "seldonio/mlserver:{version}-slim"
+DefaultBaseImage = "quay.io/opendatahub/mlserver:{version}-slim"
 
 # Optional files checked in the build context to dynamically generate COPY
 # instructions, ensuring compatibility with both Docker and Podman/Buildah.

@@ -49,6 +49,16 @@ class CloudEventsMiddleware(InferenceMiddleware):
     def __init__(self, settings: Settings):
         self._settings = settings
         self._namespace = get_namespace()
+        self._ce_namespace = settings.cloudevents_namespace
+
+    def _get_ce_type(self, ce_type: CloudEventsTypes) -> str:
+        """Get CloudEvents type value using the configured namespace."""
+        if ce_type == CloudEventsTypes.Request:
+            return f"{self._ce_namespace}.inference.request"
+        elif ce_type == CloudEventsTypes.Response:
+            return f"{self._ce_namespace}.inference.response"
+        # Fallback to enum value for backward compatibility
+        return ce_type.value
 
     def _get_headers(
         self,
@@ -56,14 +66,14 @@ class CloudEventsMiddleware(InferenceMiddleware):
         model_settings: ModelSettings,
         ce_id: str | None,
     ) -> dict[str, str]:
-        source = f"io.seldon.serving.deployment.{self._settings.server_name}"
+        source = f"{self._ce_namespace}.deployment.{self._settings.server_name}"
         if self._namespace:
             source = f"{source}.{self._namespace}"
 
         ce_headers = {
             CLOUDEVENTS_HEADER_SPECVERSION: CLOUDEVENTS_HEADER_SPECVERSION_DEFAULT,
             CLOUDEVENTS_HEADER_SOURCE: source,
-            CLOUDEVENTS_HEADER_TYPE: ce_type.value,
+            CLOUDEVENTS_HEADER_TYPE: self._get_ce_type(ce_type),
             CLOUDEVENTS_HEADER_MODEL_ID: model_settings.name,
             CLOUDEVENTS_HEADER_INFERENCE_SERVICE: self._settings.server_name,
             CLOUDEVENTS_HEADER_ENDPOINT: model_settings.name,
