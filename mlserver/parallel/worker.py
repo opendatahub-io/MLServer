@@ -200,7 +200,7 @@ class Worker(Process):
         return readable
 
     async def _process_request(self, request) -> ModelResponseMessage:
-        if self._settings.rest_worker_json:
+        if self._settings.rest_worker_json or self._settings.rest_worker_binary:
             from ..rest.worker import RAW_INFER_METHOD, process_raw_request
 
             if request.method_name == RAW_INFER_METHOD:

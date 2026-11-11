@@ -22,8 +22,9 @@ successful health-check GETs are filtered unless `debug` is also enabled; failed
 health-check responses are always logged.
 
 The [Inference Performance Options guide](../user-guide/performance.md) explains
-how to enable worker REST JSON, compact raw FP32 gRPC inputs and the optional
-ZeroMQ inference transport, including their requirements and defaults.
+how to enable worker REST JSON, compact raw FP32 gRPC inputs, REST binary
+tensor data and the optional ZeroMQ inference transport, including their
+requirements and defaults.
 
 ## Settings
 

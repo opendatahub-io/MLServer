@@ -27,12 +27,14 @@ from ..parallel.logging import logger
 from ..types import InferenceRequest, InferenceResponse
 from ..utils import extract_headers, insert_headers
 
+from .binary import is_binary_request
+
 if TYPE_CHECKING:
     from ..parallel.messages import ModelRequestMessage, ModelResponseMessage
     from ..parallel.worker import Worker
 
 RAW_INFER_METHOD = "__mlserver_rest_worker_infer__"
-_RESPONSE_ADAPTER = TypeAdapter(InferenceResponse)
+_RESPONSE_ADAPTER: TypeAdapter[InferenceResponse] = TypeAdapter(InferenceResponse)
 _CONVERSION_DURATION_ATTR = "_rest_conversion_duration"
 _INFERENCE_SUCCEEDED_ATTR = "_rest_inference_succeeded"
 
@@ -120,6 +122,23 @@ def encode_response(response: InferenceResponse) -> bytes:
     return encode_to_json_bytes(content)
 
 
+def _parse_worker_binary(
+    body: bytes, headers: dict[str, str]
+) -> InferenceRequest | RawReply:
+    """Parse a binary tensor frame, mapping errors to a HTTP 400 reply.
+
+    Mirrors the frontend endpoint's ``BinaryTensorError`` handling so both
+    processing locations return the same status and body.
+    """
+    from .binary import BinaryTensorError, get_header_length, parse_binary_request
+
+    try:
+        payload, _ = parse_binary_request(body, get_header_length(headers))
+    except BinaryTensorError as error:
+        return RawReply(encode_to_json_bytes({"detail": error.detail}), {}, status=400)
+    return payload
+
+
 async def process_raw_request(
     worker: Worker, request: ModelRequestMessage
 ) -> ModelResponseMessage:
@@ -136,9 +155,19 @@ async def process_raw_request(
         body, headers = request.method_args
         if not isinstance(body, bytes) or not isinstance(headers, dict):
             raise TypeError("Raw REST inference requires bytes and HTTP headers")
+        # Binary frames are only honored when the extension is enabled: a
+        # stray Inference-Header-Content-Length on a JSON request must not
+        # bypass the rest_binary_tensor opt-in (a smuggled frame parses as
+        # JSON and fails validation instead of producing a binary reply).
+        binary_request = worker._settings.rest_binary_tensor and is_binary_request(
+            headers
+        )
         started = perf_counter()
         try:
-            payload = parse_body(body, _json_content(headers))
+            if binary_request:
+                payload = _parse_worker_binary(body, headers)
+            else:
+                payload = parse_body(body, _json_content(headers))
             if isinstance(payload, RawReply):
                 return ModelResponseMessage(id=request.id, return_value=payload)
             insert_headers(payload, headers)
@@ -158,13 +187,19 @@ async def process_raw_request(
         inference_succeeded = True
         started = perf_counter()
         try:
-            response_headers = extract_headers(response) or {}
-            encoded = encode_response(response)
+            if binary_request:
+                # Import at the dispatch boundary: binary_endpoints imports
+                # this module, so the dependency is deferred to call time.
+                from .binary_endpoints import encode_worker_binary_reply
+
+                reply = encode_worker_binary_reply(response, payload)
+            else:
+                response_headers = extract_headers(response) or {}
+                encoded = encode_response(response)
+                reply = RawReply(encoded, response_headers)
         finally:
             conversion_duration += perf_counter() - started
-        reply = RawReply(
-            encoded, response_headers, conversion_duration=conversion_duration
-        )
+        reply.conversion_duration = conversion_duration
         return ModelResponseMessage(id=request.id, return_value=reply)
     except (Exception, asyncio.CancelledError) as error:
         # Returning an error envelope bypasses Worker._process_request's usual

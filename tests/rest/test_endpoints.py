@@ -6,6 +6,7 @@ from httpx_sse import aconnect_sse
 
 from mlserver import __version__
 from mlserver.batching.adaptive import AdaptiveBatcher
+from mlserver.handlers import DataPlane
 from mlserver.settings import ModelSettings
 from mlserver.model import MLModel
 from mlserver.registry import MultiModelRegistry
@@ -478,3 +479,24 @@ async def test_runtimes_endpoint_sorted_list(rest_client):
     # Verify list is sorted
     sorted_list = sorted(implementations)
     assert implementations == sorted_list
+
+
+async def test_metadata_advertises_binary_tensor_extension(
+    data_plane: DataPlane, rest_client: AsyncClient
+):
+    """The KServe v2 Binary Tensor Data Extension is discoverable."""
+    data_plane._settings.rest_binary_tensor = True
+    response = await rest_client.get("/v2")
+
+    metadata = MetadataServerResponse.model_validate(response.json())
+    assert "binary_tensor_data" in metadata.extensions
+
+
+async def test_metadata_without_binary_tensor_omits_extension(
+    rest_client: AsyncClient,
+):
+    """The extension stays absent unless the opt-in is enabled."""
+    response = await rest_client.get("/v2")
+
+    metadata = MetadataServerResponse.model_validate(response.json())
+    assert "binary_tensor_data" not in metadata.extensions
