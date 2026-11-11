@@ -26,9 +26,10 @@ LOGICAL_BYTES_SENTINEL = ("mlserver-internal", "logical-bytes-elements")
 def _set_logical_elements(request_input: InputOrOutput) -> None:
     """Mark an input as carrying logical (opaque) byte elements.
 
-    Used by the binary tensor transport's parser (via the raw header
-    dict before validation) and available for any internal caller that
-    needs to flag programmatic inputs.
+    Used by test fixtures and any internal caller that needs to flag
+    programmatic inputs; the binary tensor transport's parser sets the
+    sentinel directly on the raw header dict (pre-validation, before
+    the RequestInput object exists).
     """
     if request_input.parameters is None:
         request_input.parameters = Parameters()

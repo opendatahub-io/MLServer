@@ -8,7 +8,7 @@ from . import model_repository_pb2 as mr_pb
 
 from .. import types
 from ..errors import InferenceError
-from ..raw import extract_raw, inject_raw
+from ..raw import inject_raw, pack
 
 _FIELDS = {
     Datatype.BOOL: "bool_contents",
@@ -229,11 +229,14 @@ class ModelInferRequestConverter:
     ) -> pb.ModelInferRequest:
         use_raw = use_raw or _requires_raw(type_object.inputs)
         inputs = type_object.inputs
+        raw: list[bytes] = []
         if use_raw:
-            # Extract the raw data in advance, to ensure the `data` field of
-            # the input objects is empty
-            inputs = [input.model_copy(deep=True) for input in type_object.inputs]
-            inputs, raw = extract_raw(inputs)  # type: ignore
+            # Pack the raw payload straight from the original inputs.  The
+            # protobuf below is built with include_contents=False, which
+            # never reads the ``data`` field, so neither a deep copy nor
+            # clearing the data is required — the original objects are left
+            # untouched.
+            raw = [pack(inp) for inp in inputs]
 
         model_infer_request = pb.ModelInferRequest(
             model_name=model_name,
@@ -446,11 +449,16 @@ class ModelInferResponseConverter:
     ) -> pb.ModelInferResponse:
         use_raw = use_raw or _requires_raw(type_object.outputs)
         outputs = type_object.outputs
+        raw: list[bytes] = []
         if use_raw:
-            # Extract the raw data in advance, to ensure the `data` field of
-            # the output objects is empty
-            outputs = [output.model_copy(deep=True) for output in type_object.outputs]
-            outputs, raw = extract_raw(outputs)  # type: ignore
+            # Pack the raw payload straight from the original outputs.  The
+            # protobuf below is built with include_contents=False, which
+            # never reads the ``data`` field, so neither a deep copy nor
+            # clearing the data is required — the original objects are left
+            # untouched.  (The previous deep copy walked every list element
+            # of every output tensor in Python, which profiling attributed
+            # to a third of gRPC serving CPU on large detection outputs.)
+            raw = [pack(output) for output in outputs]
 
         model_infer_response = pb.ModelInferResponse(
             model_name=type_object.model_name,
