@@ -3456,21 +3456,21 @@ files = [
 
 [[package]]
 name = "pip-licenses"
-version = "4.4.0"
+version = "5.5.5"
 description = "Dump the software license list of Python packages installed with pip."
 optional = false
-python-versions = "~=3.8"
+python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "pip-licenses-4.4.0.tar.gz", hash = "sha256:996817118375445243a34faafe23c06f6b2d250247c4046571b5a6722d45be69"},
-    {file = "pip_licenses-4.4.0-py3-none-any.whl", hash = "sha256:dbad2ac5a25f574cabe2716f2f031a0c5fa359bed9b3ef615301f4e546893b46"},
+    {file = "pip_licenses-5.5.5-py3-none-any.whl", hash = "sha256:f4c4c6d9e6a03612cf59f29f19dc8ab54904d82e055b8e191498f2279a224e14"},
+    {file = "pip_licenses-5.5.5.tar.gz", hash = "sha256:60750c006adf7a0910347b726e8ee9fee3bc8d2e7c8307a5c4ec0776c8e2a276"},
 ]
 
 [package.dependencies]
-prettytable = ">=2.3.0"
+prettytable = ">=3.12.0"
 
 [package.extras]
-test = ["docutils", "mypy", "pytest-cov", "pytest-pycodestyle", "pytest-runner"]
+dev = ["docutils (>=0.19)", "mypy", "pip-tools", "pypandoc", "pytest-cov", "pytest-runner", "ruff", "tomli-w", "virtualenv (>=21.1.0)", "wheel"]
 
 [[package]]
 name = "platformdirs"
@@ -6046,4 +6046,4 @@ zmq = ["pyzmq"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "8a3a48fa0edbebde3d550c0cc33f78a2212af7167a568e97a5bd9b9a5f45fba7"
+content-hash = "8eded7dfa82e12f3163c5b0cff6ee0a4714bed15579b7f194370619c7cbe86c1"

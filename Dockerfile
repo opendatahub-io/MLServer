@@ -95,8 +95,8 @@ RUN --mount=type=bind,from=wheel-builder,src=/opt/mlserver/dist,target=./dist \
     done && \
     rm -rf /root/.cache/pip
 
-COPY ./licenses/license.txt .
-COPY ./licenses/license.txt /licenses/
+COPY ./licenses/cpu/license.txt .
+COPY ./licenses/cpu/license.txt /licenses/
 
 # Generate trusted-runtimes.json with only installed runtimes
 RUN env TRUSTED_RUNTIMES="$TRUSTED_RUNTIMES" python3 <<'EOF'

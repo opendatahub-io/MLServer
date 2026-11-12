@@ -30,7 +30,8 @@ jobs:
           git \
             --no-pager diff \
             --exit-code \
-            ./licenses/license_info.no_versions.csv
+            ./licenses/cpu/license_info.no_versions.csv \
+            ./licenses/cuda/license_info.no_versions.csv
       - name: Open PR with License Changes
         if: ${{ failure() }}
         uses: peter-evans/create-pull-request@v6
