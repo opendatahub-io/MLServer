@@ -45,8 +45,8 @@ brotli==1.2.1 \
 certifi==2026.10.23 \
     --hash=sha256:ad8182e9e73d6d0adaebb791600f2da79daf1af8609933f4b6f147fe7d461e36
 
-click==8.5.0 \
-    --hash=sha256:7ee3d83528fa7ab316055575a071bdc250d2b331de49cf3c87536594c723d4b4
+click==8.5.1 \
+    --hash=sha256:cddce66fd1f90b9341da8a4325cb22e3f0bd45518b281942deec99d133af0efb
 
 fastapi==0.136.3 \
     --hash=sha256:0f2436cb16ebc451313355edd22e7898ff8dc557cd7b0c40a50c72de5f685677
@@ -146,9 +146,9 @@ orjson==3.13.0 \
 packaging==26.3 \
     --hash=sha256:8d79dff411cc4edfe2726e5094d217e07bd88523ccc2a9956cb619bad102fbc7
 
-pandas==3.1.0 \
-    --hash=sha256:37adbfa8eb4936c45f3df905336b322ca9c77b113e38a741b301ff26faa5a7fc \
-    --hash=sha256:afbfe04d8d94f4ec9775e4efffaa2504b2b605e76049316f6bb9b28420f90cd2
+pandas==3.1.1 \
+    --hash=sha256:43fc5c6ff6cfedfb150dc5185b7dd5eca630b5227d3328d39bd156168a85253e \
+    --hash=sha256:9d256c035f024fec46f8e9ac201e94b528d8885dd0fb6c4f10d4e502e797fbd2
 
 prometheus-client==0.26.0 \
     --hash=sha256:8bd9e4d484179f4cfb9f64b7b5c217c3581a83f2092fe6f9759c07eaa8637f38
@@ -164,12 +164,12 @@ protobuf==6.33.6 \
 py-grpc-prometheus==0.8.0 \
     --hash=sha256:57adc43ba8d3c38b1ed9a840ea2dfe780f8c11f72b13dc50e42ec0d7b59bee21
 
-pydantic==2.14.2 \
-    --hash=sha256:f34c919daeef57d5473b895276652b44e6a59f51efe1a0ce86c0d542ea67d12e
+pydantic==2.14.3 \
+    --hash=sha256:568c3333e3951e225b5aab1b0332fceb195587dd070455fb2e7abc77f36c4efb
 
-pydantic-core==2.50.2 \
-    --hash=sha256:67e17e5bef9bc5808a32616367a245c707a24d13b0bc077f65c445957772ce3a \
-    --hash=sha256:c3b65f4b82038b543421b74364e17216092eb4b443bb992befa056164dad5ff9
+pydantic-core==2.50.4 \
+    --hash=sha256:089c0510c6b197fd8109c39e5f48d2b749f738e96008b77ae098356f4c412c74 \
+    --hash=sha256:6792c4569ae6915210687711f1ceb90353a51cb27125df4c4b253e29f25f9b60
 
 pydantic-settings==2.16.2 \
     --hash=sha256:d1b0f69f4011efc2a7821ce96a04621d8a06af1fc686123c85631035eda6f0e3
@@ -202,8 +202,8 @@ tritonclient==2.73.0+rhaiv.1 \
 typing-extensions==4.16.0 \
     --hash=sha256:97ad7ffcb16360509723f842d72d90fa93428d05caa6899f64cca34277fbedd1
 
-typing-inspection==0.4.4 \
-    --hash=sha256:f281451de5bacd033dad2fe240de905cd36fecdbfd5279c0093bd4e68302f630
+typing-inspection==0.4.5 \
+    --hash=sha256:7ed19a95c446d80e93b7b7b85379ac9090c08b28a1d2cb5b27ca96b47b51bfc5
 
 tzdata==2026.6 \
     --hash=sha256:47b61a1e9f25d5676ad3043e5925c83b73f2a13f4dc0acc81ac486a920fec1fa
