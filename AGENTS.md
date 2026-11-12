@@ -6,7 +6,7 @@ Konflux builds, runtime security hardening, and release automation.
 Poetry-only monorepo: core `mlserver` + 4 runtime packages under `runtimes/`.
 
 - **Python:** 3.11–3.12 (all branches)
-- **Package manager:** Poetry 2.1.1 (always use Poetry, never pip install directly).
+- **Package manager:** Poetry 2.5.1 (always use Poetry, never pip install directly).
   Poetry upgrades must be explicit, standalone changes, never incidental to
   other work.
 

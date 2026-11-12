@@ -10,7 +10,7 @@
 | Tool | Version | Purpose |
 |------|---------|---------|
 | Python | 3.11–3.12 | Runtime |
-| Poetry | 1.x | Dependency management and virtualenvs |
+| Poetry | 2.5.1 | Dependency management and virtualenvs |
 | Docker | 20+ | Container builds and integration tests |
 | Make | any | Task runner (optional, wraps common commands) |
 | protoc | 3.x | gRPC protobuf compilation (only if modifying `.proto` files) |

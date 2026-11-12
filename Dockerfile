@@ -3,7 +3,7 @@ ARG RUNTIMES="lightgbm onnx sklearn xgboost"
 # Space-separated list of runtime import paths
 ARG TRUSTED_RUNTIMES="mlserver_lightgbm.LightGBMModel mlserver_onnx.OnnxModel mlserver_sklearn.SKLearnModel mlserver_xgboost.XGBoostModel"
 ARG PYTHON_VERSION=3.12
-ARG POETRY_VERSION="2.1.1"
+ARG POETRY_VERSION="2.5.1"
 
 FROM ${BASE_IMAGE} AS wheel-builder
 
