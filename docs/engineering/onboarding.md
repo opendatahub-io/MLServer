@@ -9,7 +9,7 @@
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Python | 3.9+ | Runtime |
+| Python | 3.11–3.12 | Runtime |
 | Poetry | 1.x | Dependency management and virtualenvs |
 | Docker | 20+ | Container builds and integration tests |
 | Make | any | Task runner (optional, wraps common commands) |

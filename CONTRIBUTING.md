@@ -9,7 +9,7 @@ development setup, coding conventions, and PR process.
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Python | 3.10+ | Runtime |
+| Python | 3.11–3.12 | Runtime |
 | Poetry | 1.x | Dependency management |
 | Make | any | Task runner |
 | Docker | 20+ | Container builds and integration tests |

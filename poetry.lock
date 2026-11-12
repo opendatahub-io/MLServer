@@ -210,7 +210,6 @@ files = [
 [package.dependencies]
 aiohappyeyeballs = ">=2.5.0"
 aiosignal = ">=1.4.0"
-async-timeout = {version = ">=4.0,<6.0", markers = "python_version < \"3.11\""}
 attrs = ">=17.3.0"
 frozenlist = ">=1.1.1"
 multidict = ">=4.5,<7.0"
@@ -301,7 +300,6 @@ files = [
 ]
 
 [package.dependencies]
-exceptiongroup = {version = ">=1.0.2", markers = "python_version < \"3.11\""}
 idna = ">=2.8"
 typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 
@@ -335,9 +333,6 @@ files = [
     {file = "asgiref-3.8.1.tar.gz", hash = "sha256:c343bd80a0bec947a9860adb4c432ffa7db769836c64238fc34bdc3fec84d590"},
 ]
 
-[package.dependencies]
-typing-extensions = {version = ">=4", markers = "python_version < \"3.11\""}
-
 [package.extras]
 tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
 
@@ -356,19 +351,6 @@ files = [
 [package.dependencies]
 six = ">=1.6.1,<2.0"
 wheel = ">=0.23.0,<1.0"
-
-[[package]]
-name = "async-timeout"
-version = "4.0.3"
-description = "Timeout context manager for asyncio programs"
-optional = false
-python-versions = ">=3.7"
-groups = ["main", "dev"]
-markers = "python_version == \"3.10\""
-files = [
-    {file = "async-timeout-4.0.3.tar.gz", hash = "sha256:4640d96be84d82d02ed59ea2b7105a0f7b33abe8703703cd0ab0bf87c427522f"},
-    {file = "async_timeout-4.0.3-py3-none-any.whl", hash = "sha256:7405140ff1230c310e51dc27b3145b9092d659ce68ff733fb0cefe3ee42be028"},
-]
 
 [[package]]
 name = "attrs"
@@ -489,8 +471,6 @@ mypy-extensions = ">=0.4.3"
 packaging = ">=22.0"
 pathspec = ">=0.9.0"
 platformdirs = ">=2"
-tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
-typing-extensions = {version = ">=4.0.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
 colorama = ["colorama (>=0.4.3)"]
@@ -1052,22 +1032,6 @@ files = [
 ]
 
 [[package]]
-name = "exceptiongroup"
-version = "1.2.2"
-description = "Backport of PEP 654 (exception groups)"
-optional = false
-python-versions = ">=3.7"
-groups = ["main", "dev", "docs"]
-markers = "python_version == \"3.10\""
-files = [
-    {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
-    {file = "exceptiongroup-1.2.2.tar.gz", hash = "sha256:47c2edf7c6738fafb49fd34290706d1a1a2f4d1c6df275526b62cbb4aa5393cc"},
-]
-
-[package.extras]
-test = ["pytest (>=6)"]
-
-[[package]]
 name = "execnet"
 version = "2.1.1"
 description = "execnet: rapid multi-Python deployment"
@@ -1155,7 +1119,6 @@ files = [
 [package.dependencies]
 black = ">=22.1.0"
 flake8 = ">=3"
-tomli = {version = "*", markers = "python_version < \"3.11\""}
 
 [package.extras]
 develop = ["build", "twine"]
@@ -2421,7 +2384,6 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.21.2", markers = "python_version >= \"3.10\""},
     {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
 ]
@@ -2434,7 +2396,7 @@ name = "mlserver-lightgbm"
 version = "1.7.0.dev0"
 description = "LightGBM runtime for MLServer"
 optional = false
-python-versions = ">=3.10,<3.13"
+python-versions = ">=3.11,<3.13"
 groups = ["all-runtimes", "odh-runtimes"]
 files = []
 develop = true
@@ -2453,7 +2415,7 @@ name = "mlserver-onnx"
 version = "1.7.0.dev0"
 description = "ONNX runtime for MLServer"
 optional = false
-python-versions = ">=3.10,<3.13"
+python-versions = ">=3.11,<3.13"
 groups = ["all-runtimes", "odh-runtimes", "odh-runtimes-cuda"]
 files = []
 develop = true
@@ -2461,18 +2423,12 @@ develop = true
 [package.dependencies]
 mlserver = "*"
 onnx = ">=1.21.0"
-onnxruntime = [
-    {version = ">=1.20.0,<1.24.0", optional = true, markers = "python_version < \"3.11\""},
-    {version = ">=1.20.0,<1.27.0", optional = true, markers = "python_version >= \"3.11\""},
-]
-onnxruntime-gpu = [
-    {version = ">=1.20.0,<1.24.0", optional = true, markers = "python_version < \"3.11\""},
-    {version = ">=1.20.0,<1.27.0", optional = true, markers = "python_version >= \"3.11\""},
-]
+onnxruntime = {version = ">=1.20.0,<1.27.0", optional = true}
+onnxruntime-gpu = {version = ">=1.20.0,<1.27.0", optional = true}
 
 [package.extras]
-cpu = ["onnxruntime (>=1.20.0,<1.24.0) ; python_version < \"3.11\"", "onnxruntime (>=1.20.0,<1.27.0) ; python_version >= \"3.11\""]
-cuda = ["onnxruntime-gpu (>=1.20.0,<1.24.0) ; python_version < \"3.11\"", "onnxruntime-gpu (>=1.20.0,<1.27.0) ; python_version >= \"3.11\""]
+cpu = ["onnxruntime (>=1.20.0,<1.27.0)"]
+cuda = ["onnxruntime-gpu (>=1.20.0,<1.27.0)"]
 
 [package.source]
 type = "directory"
@@ -2483,7 +2439,7 @@ name = "mlserver-sklearn"
 version = "1.7.0.dev0"
 description = "Scikit-Learn runtime for MLServer"
 optional = false
-python-versions = ">=3.10,<3.13"
+python-versions = ">=3.11,<3.13"
 groups = ["all-runtimes", "odh-runtimes"]
 files = []
 develop = true
@@ -2502,7 +2458,7 @@ name = "mlserver-xgboost"
 version = "1.7.0.dev0"
 description = "XGBoost runtime for MLServer"
 optional = false
-python-versions = ">=3.10,<3.13"
+python-versions = ">=3.11,<3.13"
 groups = ["all-runtimes", "odh-runtimes"]
 files = []
 develop = true
@@ -2635,9 +2591,6 @@ files = [
     {file = "multidict-6.1.0.tar.gz", hash = "sha256:22ae2ebf9b0c69d206c003e2f6a914ea33f0a932d4aa16f236afc049d9958f4a"},
 ]
 
-[package.dependencies]
-typing-extensions = {version = ">=4.1.0", markers = "python_version < \"3.11\""}
-
 [[package]]
 name = "mypy"
 version = "1.11.2"
@@ -2677,7 +2630,6 @@ files = [
 
 [package.dependencies]
 mypy-extensions = ">=1.0.0"
-tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
 typing-extensions = ">=4.6.0"
 
 [package.extras]
@@ -3504,7 +3456,6 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.22.4", markers = "python_version < \"3.11\""},
     {version = ">=1.23.2", markers = "python_version == \"3.11\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
 ]
@@ -4065,7 +4016,6 @@ files = [
 
 [package.dependencies]
 packaging = ">=24.1"
-tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
 docs = ["furo (>=2024.8.6)", "sphinx-autodoc-typehints (>=2.4.1)"]
@@ -4101,11 +4051,9 @@ files = [
 
 [package.dependencies]
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
 iniconfig = "*"
 packaging = "*"
 pluggy = ">=0.12,<2.0"
-tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
@@ -4595,7 +4543,6 @@ files = [
 [package.dependencies]
 markdown-it-py = ">=2.2.0"
 pygments = ">=2.13.0,<3.0.0"
-typing-extensions = {version = ">=4.0.0,<5.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
@@ -5186,7 +5133,7 @@ description = "TensorFlow IO"
 optional = false
 python-versions = "<3.13,>=3.7"
 groups = ["docker"]
-markers = "python_version < \"3.12\""
+markers = "python_version == \"3.11\""
 files = [
     {file = "tensorflow_io_gcs_filesystem-0.37.1-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:249c12b830165841411ba71e08215d0e94277a49c551e6dd5d72aab54fe5491b"},
     {file = "tensorflow_io_gcs_filesystem-0.37.1-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:257aab23470a0796978efc9c2bcf8b0bc80f22e6298612a4c0a50d3f4e88060c"},
@@ -5258,7 +5205,8 @@ version = "2.4.1"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev", "test"]
+groups = ["dev"]
+markers = "python_version == \"3.11\""
 files = [
     {file = "tomli-2.4.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f8f0fc26ec2cc2b965b7a3b87cd19c5c6b8c5e5f436b984e85f486d652285c30"},
     {file = "tomli-2.4.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4ab97e64ccda8756376892c53a72bd1f964e519c77236368527f758fbc36a53a"},
@@ -5308,7 +5256,6 @@ files = [
     {file = "tomli-2.4.1-py3-none-any.whl", hash = "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe"},
     {file = "tomli-2.4.1.tar.gz", hash = "sha256:7c7e1a961a0b2f2472c1ac5b69affa0ae1132c39adcb67aba98568702b9cc23f"},
 ]
-markers = {dev = "python_version < \"3.12\"", test = "python_version == \"3.10\""}
 
 [[package]]
 name = "tox"
@@ -5331,7 +5278,6 @@ packaging = ">=24.1"
 platformdirs = ">=4.2.2"
 pluggy = ">=1.5"
 pyproject-api = ">=1.7.1"
-tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
 virtualenv = ">=20.26.3"
 
 [package.extras]
@@ -5500,7 +5446,6 @@ files = [
 [package.dependencies]
 click = ">=7.0"
 h11 = ">=0.8"
-typing-extensions = {version = ">=4.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 standard = ["colorama (>=0.4) ; sys_platform == \"win32\"", "httptools (>=0.5.0)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "uvloop (>=0.14.0,!=0.15.0,!=0.15.1) ; sys_platform != \"win32\" and sys_platform != \"cygwin\" and platform_python_implementation != \"PyPy\"", "watchfiles (>=0.13)", "websockets (>=10.4)"]
@@ -6180,5 +6125,5 @@ zmq = ["pyzmq"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.10,<3.13"
-content-hash = "9b3767db8134988b1d21983aa20d1d1875e9363973681184090074b58c7b2569"
+python-versions = ">=3.11,<3.13"
+content-hash = "8a3a48fa0edbebde3d550c0cc33f78a2212af7167a568e97a5bd9b9a5f45fba7"
