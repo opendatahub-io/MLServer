@@ -176,7 +176,7 @@ async def build(
 
 
 @root.command("init")
-# TODO: Update to have template(s) in the SeldonIO org
+# TODO: Update to have template(s) in the KServe org
 @click.option("-t", "--template", default="https://github.com/EthicalML/sml-security/")
 @click_async
 async def init_project(template: str):
