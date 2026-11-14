@@ -14,15 +14,18 @@ root of the model repository. They can also be set with environment variables.
 | --- | --- | --- |
 | `grpc_raw_input_buffers` | `false` | `MLSERVER_GRPC_RAW_INPUT_BUFFERS` |
 | `rest_worker_json` | `false` | `MLSERVER_REST_WORKER_JSON` |
+| `rest_binary_tensor` | `false` | `MLSERVER_REST_BINARY_TENSOR` |
+| `rest_worker_binary` | `false` | `MLSERVER_REST_WORKER_BINARY` |
 | `parallel_inference_transport` | `"queue"` | `MLSERVER_PARALLEL_INFERENCE_TRANSPORT` |
 
-For example, the following enables all three options with two worker processes:
+For example, the following enables all four options with two worker processes:
 
 ```json
 {
   "parallel_workers": 2,
   "grpc_raw_input_buffers": true,
   "rest_worker_json": true,
+  "rest_binary_tensor": true,
   "parallel_inference_transport": "zmq"
 }
 ```
@@ -88,6 +91,58 @@ and decompression also remain outside this metric.
 Success means inference completed, rather than HTTP response delivery succeeded.
 An error formatting that completed prediction retains the inference success,
 as on the standard path.
+
+### REST Binary Tensor Data
+
+`rest_binary_tensor=true` enables the KServe v2 Binary Tensor Data
+Extension on unary REST inference routes. Requests send a JSON inference
+header followed by raw tensor bytes, and responses follow the client's
+per-output binary/JSON negotiation, avoiding the construction of large
+Python float lists in the frontend in both directions.
+
+A binary request carries the length of its JSON header in the
+`Inference-Header-Content-Length` header, the `InferenceRequest` object
+in the first bytes of the body, and raw tensor data in the remainder.
+Numeric tensors arrive as flat NumPy views of the body; BYTES tensors use
+the KServe length-prefixed element framing. An output is encoded as raw
+bytes when the request-wide `binary_data_output` parameter, or that
+output's own `binary_data` parameter, selects binary; the raw data is
+appended after a JSON footer carrying a `binary_data_size` parameter per
+binary output. Outputs that negotiate JSON keep inline data, so a request
+can mix both. Malformed binary frames return `400` responses.
+
+Enable this only when the input codecs of models receiving binary requests
+accept NumPy-backed tensor data, such as the ONNX runtime's default NumPy
+codec — the same compatibility consideration as raw FP32 gRPC inputs.
+Because the setting is server-wide, check compatibility across all models
+served by the instance. Requests without
+`Inference-Header-Content-Length` keep the standard JSON path.
+
+Unlike worker JSON processing, binary requests remain compatible with
+models that use adaptive batching: array-backed inputs are restored to
+the public list representation before frontend batching, and mixed BYTES
+batches are normalized to per-contract elements before merging. When
+`rest_worker_json` is also enabled, JSON bodies keep the worker JSON path
+unless the request may negotiate binary outputs; binary frames always
+take the binary endpoint. The server advertises `binary_tensor_data` in
+the `extensions` list of `GET /v2` while this setting is enabled.
+
+### REST Binary Tensor Data in Workers
+
+`rest_worker_binary=true` (requires `rest_binary_tensor=true`) forwards
+binary tensor frames to the selected model's worker as raw bytes. The
+worker parses the JSON header, runs inference and encodes the negotiated
+response, distributing that CPU work across worker processes — the
+binary counterpart of worker JSON processing. Both inference IPC
+crossings carry raw bytes instead of Python float lists.
+
+This applies to unary `/infer` routes for models using parallel
+inference with `max_batch_size` and `max_batch_time` both `0`. Batched
+models, models without parallel workers and JSON requests keep frontend
+preparation; JSON bodies follow `rest_worker_json` regardless of this
+setting. Inference accounting stays owned by the frontend, including the
+worker's conversion durations, and a malformed frame returns `400` even
+when model lookup fails — matching the JSON path's error priority.
 
 ### ZeroMQ Inference Transport
 

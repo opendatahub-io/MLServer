@@ -60,7 +60,48 @@ def create_app(
 
     infer_endpoint: Callable = endpoints.infer
     inference_openapi = None
-    if settings.rest_worker_json:
+    if settings.rest_binary_tensor:
+        from .binary_endpoints import BinaryTensorEndpoints
+
+        # JSON bodies keep the rest_worker_json worker path when both
+        # settings are enabled; binary frames always take the binary
+        # endpoint, which routes ordinary JSON requests to json_infer.
+        json_infer = None
+        if settings.rest_worker_json:
+            from .worker import RawEndpoints
+
+            json_infer = RawEndpoints(data_plane).infer
+
+        binary_infer = BinaryTensorEndpoints(
+            data_plane, json_infer=json_infer, worker_binary=settings.rest_worker_binary
+        ).infer
+
+        async def infer_with_binary(
+            request: Request,
+            model_name: str,
+            model_version: str | None = None,
+        ) -> FastAPIResponse:
+            return await binary_infer(request, model_name, model_version)
+
+        infer_endpoint = infer_with_binary
+        inference_openapi = {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"$ref": "#/components/schemas/InferenceRequest"}
+                    },
+                    "application/octet-stream": {
+                        "description": (
+                            "Binary tensor data (KServe v2 binary tensor "
+                            "extension: JSON header + raw tensor bytes, "
+                            "with Inference-Header-Content-Length)"
+                        )
+                    },
+                },
+            },
+        }
+    elif settings.rest_worker_json:
         from .worker import RawEndpoints
 
         infer_endpoint = RawEndpoints(data_plane).infer

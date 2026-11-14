@@ -9,6 +9,51 @@ from .utils import SingleInputRequestCodec, InputOrOutput, inject_batch_dimensio
 from .lists import is_list_of
 from .string import encode_str
 
+# Parameter marking logical BYTES elements (the binary tensor
+# transport's length-prefixed wire elements).  Flagged data preserves
+# element semantics through container changes — the NumPy codec decodes
+# it as an object array of exact byte elements — while unflagged bytes
+# lists keep the legacy packed-buffer interpretation.
+#
+# The value is a TUPLE sentinel: JSON parameters can only produce
+# lists, so a client cannot forge the flag through an ordinary request
+# (Parameters uses extra="allow", making any string key wire-settable).
+# Pickle (IPC) preserves tuples, so the flag survives the worker hop.
+LOGICAL_BYTES_ELEMENTS = "_mlserver_logical_bytes_elements"
+LOGICAL_BYTES_SENTINEL = ("mlserver-internal", "logical-bytes-elements")
+
+
+def _set_logical_elements(request_input: InputOrOutput) -> None:
+    """Mark an input as carrying logical (opaque) byte elements.
+
+    Used by test fixtures and any internal caller that needs to flag
+    programmatic inputs; the binary tensor transport's parser sets the
+    sentinel directly on the raw header dict (pre-validation, before
+    the RequestInput object exists).
+    """
+    if request_input.parameters is None:
+        request_input.parameters = Parameters()
+    setattr(request_input.parameters, LOGICAL_BYTES_ELEMENTS, LOGICAL_BYTES_SENTINEL)
+
+
+def _is_sentinel(value: Any) -> bool:
+    return isinstance(value, tuple) and value == LOGICAL_BYTES_SENTINEL
+
+
+def _has_logical_elements(input_or_output: InputOrOutput) -> bool:
+    params = input_or_output.parameters
+    if params is None:
+        return False
+    value = getattr(params, LOGICAL_BYTES_ELEMENTS, None)
+    if _is_sentinel(value):
+        return True
+    # Adaptive batching aggregates duplicate parameters into lists;
+    # every-sentinel means every merged entry carried logical elements
+    return (
+        isinstance(value, list) and bool(value) and all(_is_sentinel(v) for v in value)
+    )
+
+
 _DatatypeToNumpy = {
     Datatype.BOOL: "bool",
     Datatype.UINT8: "uint8",
@@ -42,6 +87,16 @@ def to_dtype(input_or_output: InputOrOutput) -> "np.dtype":
             # Handle special case of strings being treated as Numpy arrays
             return np.dtype(str)
 
+        if _has_logical_elements(input_or_output) or (
+            isinstance(data, np.ndarray) and data.dtype == object
+        ):
+            # Opaque byte elements (e.g. from the binary tensor
+            # transport): each element keeps its exact value and length
+            # — no fixed-width truncation, no trailing-NUL stripping.
+            # The flag survives container changes (batching converts
+            # the object array to a plain list).
+            return np.dtype(object)
+
         # bytes have variable size, so need to specify as part of type
         # TODO: Make elem size variable (and not just the last dimension)
         elem_size = input_or_output.shape[-1]
@@ -67,6 +122,13 @@ def _to_ndarray(input_or_output: InputOrOutput) -> np.ndarray:
     dtype = to_dtype(input_or_output)
 
     if Datatype(input_or_output.datatype) == Datatype.BYTES:
+        if _has_logical_elements(input_or_output) or (
+            isinstance(data, np.ndarray) and data.dtype == object
+        ):
+            # Logical byte elements: exact values and lengths, with no
+            # packed-buffer interpretation.
+            return np.array(data, dtype=object)
+
         if is_list_of(data, bytes):
             # If the inputs is of type `BYTES`, there could be multiple "lists"
             # serialised into multiple buffers.

@@ -263,6 +263,30 @@ def test_modelinferresponse_fp16_uses_raw_contents(data):
     assert response_output.data == original_data
 
 
+def test_modelinferresponse_raw_preserves_large_outputs():
+    # Large FP32 outputs take the use_raw path; conversion must not deep
+    # copy, clear or otherwise touch the caller's tensor data (the deep
+    # copy previously dominated gRPC serving CPU on detection outputs).
+    values = np.arange(300 * 91, dtype="<f4").reshape(1, 300, 91)
+    response_output = NumpyCodec.encode_output(name="output-0", payload=values)
+    original_data = response_output.data.model_copy(deep=True)
+    response = types.InferenceResponse(model_name="model", outputs=[response_output])
+
+    converted = ModelInferResponseConverter.from_types(response, use_raw=True)
+    converted_again = ModelInferResponseConverter.from_types(response, use_raw=True)
+
+    assert converted.raw_output_contents == [values.tobytes()]
+    assert converted_again.raw_output_contents == [values.tobytes()]
+    assert not converted.outputs[0].contents.ListFields()
+    assert response_output.data == original_data
+    assert len(response_output.data.root) == 300 * 91
+
+    decoded_response = ModelInferResponseConverter.to_types(converted)
+    decoded = NumpyCodec.decode_output(decoded_response.outputs[0])
+    np.testing.assert_array_equal(decoded, values)
+    assert decoded.dtype == values.dtype
+
+
 def test_modelinferrequest_mixed_datatypes_raw_roundtrip():
     fp16_values = np.asarray([1.5, 2.0], dtype=np.float16)
     fp32_values = np.asarray([3.0], dtype=np.float32)

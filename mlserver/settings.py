@@ -469,6 +469,41 @@ class Settings(BaseSettings):
     request preparation. Generate and streaming routes are unchanged.
     """
 
+    rest_binary_tensor: bool = False
+    """Accept and serve the KServe v2 binary tensor data extension over REST.
+
+    When enabled, unary REST inference requests carrying the
+    Inference-Header-Content-Length header are parsed as a JSON header
+    followed by raw binary tensor data. Standard JSON requests are
+    unaffected. Generate and streaming routes are unchanged.
+    """
+
+    rest_worker_binary: bool = False
+    """Process KServe v2 binary tensor REST requests in parallel model workers.
+
+    Requires ``rest_binary_tensor``. Unary binary tensor requests are
+    forwarded to workers as raw frames, where the binary header is
+    parsed, inference runs and the negotiated response (binary or JSON)
+    is encoded — mirroring ``rest_worker_json`` for binary traffic.
+    Nonparallel models and adaptive batching retain local frontend
+    parsing. Standard JSON requests follow ``rest_worker_json``.
+    """
+
+    @model_validator(mode="after")
+    def validate_worker_binary_needs_binary_tensor(self) -> Self:
+        """
+        Fail fast on ``rest_worker_binary`` without ``rest_binary_tensor``.
+
+        Without the binary tensor extension enabled there are no binary
+        frames to process in workers, so the flag would silently do
+        nothing. Reject the misconfiguration instead of ignoring it.
+        """
+        if self.rest_worker_binary and not self.rest_binary_tensor:
+            raise ValueError(
+                "rest_worker_binary requires rest_binary_tensor to be enabled"
+            )
+        return self
+
     root_path: str = ""
     """Set the ASGI root_path for applications submounted below a given URL path."""
 

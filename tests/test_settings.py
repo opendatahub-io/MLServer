@@ -1368,3 +1368,23 @@ def test_clear_trusted_runtime_caches_multiple_calls():
     clear_trusted_runtime_caches()
     clear_trusted_runtime_caches()
     clear_trusted_runtime_caches()
+
+
+def test_worker_binary_requires_binary_tensor():
+    """Test that rest_worker_binary without rest_binary_tensor is rejected."""
+    with pytest.raises(ValueError, match="rest_worker_binary requires"):
+        Settings(rest_worker_binary=True)
+
+
+def test_worker_binary_with_binary_tensor_allowed():
+    """Test that both binary settings together are valid."""
+    settings = Settings(rest_binary_tensor=True, rest_worker_binary=True)
+    assert settings.rest_binary_tensor is True
+    assert settings.rest_worker_binary is True
+
+
+def test_worker_binary_defaults_off():
+    """Test that both binary settings default to disabled."""
+    settings = Settings()
+    assert settings.rest_binary_tensor is False
+    assert settings.rest_worker_binary is False

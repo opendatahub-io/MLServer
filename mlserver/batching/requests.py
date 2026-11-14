@@ -2,6 +2,15 @@ from collections import defaultdict, OrderedDict
 from collections.abc import Iterable
 from typing import Any
 
+import numpy as np
+
+from ..codecs.lists import is_list_of
+from ..codecs.string import decode_str
+from ..codecs.numpy import (
+    LOGICAL_BYTES_ELEMENTS,
+    LOGICAL_BYTES_SENTINEL,
+    _has_logical_elements,
+)
 from ..types import (
     InferenceRequest,
     InferenceResponse,
@@ -11,6 +20,97 @@ from ..types import (
     ResponseOutput,
 )
 from .shape import Shape
+
+# Adaptive batching merges BYTES inputs from potentially different
+# transports.  Entries flagged as logical elements (the binary tensor
+# transport) must not be reinterpreted as legacy packed buffers, so
+# mixed representations are normalized to logical elements before the
+# data merge.
+_BYTES_DATATYPE = "BYTES"
+
+
+def _bytes_mode(data: Any, request_input: RequestInput) -> str:
+    """Classify a BYTES input's data representation."""
+    if _has_logical_elements(request_input):
+        return "logical"
+    params = request_input.parameters
+    content_type = getattr(params, "content_type", None) if params is not None else None
+    if content_type == "str":
+        # StringCodec contract: complete UTF-8 string elements
+        return "string-codec"
+    if is_list_of(data, str):
+        return "string"
+    if isinstance(data, bytes) or is_list_of(data, bytes):
+        return "legacy"
+    return "other"
+
+
+def _standalone_elements(  # noqa: C901
+    data: Any, request_input: RequestInput, mode: str
+) -> list | None:
+    """The input's elements exactly as its own codec decodes them standalone.
+
+    Mixed BYTES batches merge these per-contract element lists, so every
+    entry keeps the values (and types) it would have decoded to on its
+    own: logical elements stay exact bytes, StringCodec elements become
+    strings, legacy packed buffers split by the codec's itemsize with
+    numpy's trailing-NUL stripping.
+    """
+    if mode == "logical":
+        return list(data)
+    if mode == "string-codec":
+        if isinstance(data, bytes):
+            data = [data]
+        return [decode_str(elem) for elem in data]
+    if mode == "string":
+        return list(data)
+    if mode == "legacy":
+        if isinstance(data, bytes):
+            data = [data]
+        buffer = b"".join(data)
+        itemsize = (
+            request_input.shape[-1]
+            if request_input.shape and request_input.shape[-1] > 0
+            else 1
+        )
+        if len(buffer) % itemsize != 0:
+            # Cannot split coherently — keep as-is and let the codec
+            # surface the inconsistency
+            return list(data)
+        # numpy's fixed-width 'S' decode IS the semantics we want
+        # (trailing-NUL stripping + itemsize slicing) — call it directly
+        # instead of reimplementing (5.6x faster on large buffers)
+        return np.frombuffer(buffer, dtype=f"S{itemsize}").tolist()
+    return None
+
+
+def _normalize_bytes_entries(
+    entries: list[tuple[Any, RequestInput]],
+) -> tuple[list[Any], bool]:
+    """Normalize mixed BYTES representations to per-contract elements.
+
+    Returns the (possibly unchanged) data list and whether normalization
+    to logical elements occurred.  Each entry contributes the elements
+    its own codec contract decodes standalone, so merged values (and
+    their types) match the unbatched behaviour exactly.
+    """
+    # O(1) pre-check: only pay per-element classification when at least
+    # one entry actually carries the logical-elements flag — restoring
+    # the pre-change merge cost for non-binary-tensor traffic.
+    if not any(_has_logical_elements(request_input) for _, request_input in entries):
+        return [data for data, _ in entries], False
+
+    modes = [_bytes_mode(data, request_input) for data, request_input in entries]
+    if len(set(modes)) == 1:
+        return [data for data, _ in entries], False
+
+    normalized = []
+    for (data, request_input), mode in zip(entries, modes):
+        elements = _standalone_elements(data, request_input, mode)
+        if elements is None:
+            elements = list(data) if isinstance(data, list) else data
+        normalized.append(elements)
+    return normalized, True
 
 
 def _get_data(payload: RequestInput | ResponseOutput):
@@ -161,20 +261,37 @@ class BatchedRequests:
         # however, to simplify the implementation, here we assume that it will
         # be the same across all of them
         batch_size = 0
-        all_data = []
+        entries: list[tuple[Any, RequestInput]] = []
         all_params: dict = {}
         for internal_id, request_input in request_inputs.items():
             all_params = _merge_input_parameters(all_params, request_input)
-            all_data.append(_get_data(request_input))
+            entries.append((_get_data(request_input), request_input))
             minibatch_shape = Shape(request_input.shape)
             self._minibatch_sizes[internal_id] = minibatch_shape.batch_size
             batch_size += minibatch_shape.batch_size
 
+        sampled = next(iter(request_inputs.values()))
+        normalized = False
+        if str(sampled.datatype) == _BYTES_DATATYPE:
+            # Mixed BYTES representations must share one codec mode
+            # before the data merge.
+            all_data, normalized = _normalize_bytes_entries(entries)
+        else:
+            all_data = [data for data, _ in entries]
+
         data = _merge_data(all_data)
+        if normalized:
+            all_params[LOGICAL_BYTES_ELEMENTS] = LOGICAL_BYTES_SENTINEL
+            # A per-request content_type (e.g. "str") would select that
+            # codec for the WHOLE merged batch and mis-decode the other
+            # requests' normalized byte elements (a cross-request
+            # failure).  Clear it so codec selection falls back to the
+            # datatype — the NumPy codec honours the logical-elements
+            # contract that _normalize_bytes_entries established.
+            all_params.pop("content_type", None)
         parameters = Parameters(**all_params) if all_params else None
 
         # TODO: What should we do if list is empty?
-        sampled = next(iter(request_inputs.values()))
         shape = Shape(sampled.shape)
         shape.batch_size = batch_size
 

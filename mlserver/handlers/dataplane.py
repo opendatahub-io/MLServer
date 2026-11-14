@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from time import perf_counter
+import numpy as np
 from prometheus_client import (
     Counter,
     Summary,
@@ -135,6 +136,9 @@ class DataPlane:
     async def metadata(self) -> MetadataServerResponse:
         # Built-in extensions that are always available
         builtin_extensions = ["model_repository", "runtime_security"]
+        if self._settings.rest_binary_tensor:
+            # KServe v2 Binary Tensor Data Extension
+            builtin_extensions.append("binary_tensor_data")
         # Combine with user-configured extensions
         all_extensions = builtin_extensions + self._settings.extensions
         return MetadataServerResponse(
@@ -213,17 +217,32 @@ class DataPlane:
                 )
                 yield prediction
 
+    @staticmethod
+    def _has_array_inputs(payload: InferenceRequest) -> bool:
+        """Whether any input carries an ndarray payload.
+
+        Binary REST requests (like gRPC raw input buffers) hand compact
+        NumPy views to the model path.  List-based adaptive batching
+        cannot merge them, so they are restored to the public list
+        representation before batching.
+        """
+        return any(
+            isinstance(getattr(tensor.data, "root", tensor.data), np.ndarray)
+            for tensor in payload.inputs
+        )
+
     def _prepare_payload(
         self, payload: InferenceRequest, model: MLModel
     ) -> InferenceRequest:
-        if self._settings.grpc_raw_input_buffers and (
-            model.settings.max_batch_size or model.settings.max_batch_time
+        if (model.settings.max_batch_size or model.settings.max_batch_time) and (
+            self._settings.grpc_raw_input_buffers or self._has_array_inputs(payload)
         ):
             from ..grpc.buffers import restore_list_inputs
 
             # Batching merges the public list representation. Keep compact
-            # NumPy buffers on the measured unbatched path, while preserving
-            # the existing batching contract without changing the batcher.
+            # NumPy buffers on the measured unbatched path (gRPC raw input
+            # buffers and REST binary tensors alike), while preserving the
+            # existing batching contract without changing the batcher.
             restore_list_inputs(payload)
         if payload.id is None:
             payload.id = generate_uuid()

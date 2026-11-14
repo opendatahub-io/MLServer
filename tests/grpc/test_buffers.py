@@ -394,12 +394,17 @@ def test_restore_lists_preserves_metadata_and_nonarray_identity() -> None:
     assert ordinary.data is original_data
 
 
-@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("grpc_raw_input_buffers", [False, True])
 @pytest.mark.parametrize("batching", [(0, 0.0), (2, 0.0), (0, 0.01)])
-def test_dataplane_restores_only_enabled_batched_inputs_before_middleware(
-    data_plane: DataPlane, enabled: bool, batching: tuple[int, float]
+def test_dataplane_restores_array_inputs_before_list_batching(
+    data_plane: DataPlane, grpc_raw_input_buffers: bool, batching: tuple[int, float]
 ) -> None:
-    data_plane._settings.grpc_raw_input_buffers = enabled
+    # Array-backed inputs (from any transport: gRPC raw buffers, REST
+    # binary tensors) are restored to the public list representation
+    # whenever they meet list-based batching, independently of which
+    # transport produced them — the batcher can only merge lists.
+    # Unbatched models keep the compact representation.
+    data_plane._settings.grpc_raw_input_buffers = grpc_raw_input_buffers
     model = Mock(spec=MLModel)
     model.settings = ModelSettings(
         name="numpy-model",
@@ -409,7 +414,7 @@ def test_dataplane_restores_only_enabled_batched_inputs_before_middleware(
     )
     payload = convert_request(request())
     compact_data = payload.inputs[0].data
-    expected_type = list if enabled and any(batching) else np.ndarray
+    expected_type = list if any(batching) else np.ndarray
 
     def inspect_at_middleware(value: InferenceRequest, settings: ModelSettings) -> None:
         assert value is payload and settings is model.settings
