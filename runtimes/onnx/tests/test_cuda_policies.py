@@ -46,7 +46,7 @@ def fixed_cuda_model_uri(tmp_path) -> str:
 @pytest.mark.parametrize("graph", [False, True])
 @pytest.mark.parametrize("blocking", [False, True])
 async def test_cuda_policies_replay_fresh_inputs_and_preserve_outputs(
-    fixed_cuda_model_uri: str, graph: bool, blocking: bool
+    fixed_cuda_model_uri: str, graph: bool, blocking: bool, cuda_device_id: int
 ) -> None:
     model = OnnxModel(
         ModelSettings(
@@ -56,7 +56,9 @@ async def test_cuda_policies_replay_fresh_inputs_and_preserve_outputs(
                 uri=fixed_cuda_model_uri,
                 extra={
                     "providers": ["CUDAExecutionProvider"],
-                    "provider_options": [{"device_id": "0", "use_tf32": "0"}],
+                    "provider_options": [
+                        {"device_id": cuda_device_id, "use_tf32": "0"}
+                    ],
                     "cuda_graph": graph,
                     "cuda_blocking_sync": blocking,
                 },
@@ -66,13 +68,15 @@ async def test_cuda_policies_replay_fresh_inputs_and_preserve_outputs(
     assert await model.load()
     try:
         assert model._model.get_providers()[0] == "CUDAExecutionProvider"
+        options = model._model.get_provider_options()["CUDAExecutionProvider"]
+        assert int(options["device_id"]) == cuda_device_id
         assert isinstance(model._model, CudaGraphSession) == graph
         if blocking:
             receipt = model._cuda_wait_policy
             assert receipt is not None
             assert receipt["before_session_flags"] & 7 == 4
             assert receipt["after_session_flags"] & 7 == 4
-            assert read_device_flags(receipt["library"], 0) & 7 == 4
+            assert read_device_flags(receipt["library"], cuda_device_id) & 7 == 4
         else:
             assert model._cuda_wait_policy is None
 

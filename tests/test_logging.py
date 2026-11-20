@@ -111,10 +111,11 @@ def test_model_logging_formatter_structured(
 
     logger.info("Before model context")
     with model_context(model_settings):
-        logger.info("Inside model context")
+        logger.info("worker_execution %s", '{"event": "returned"}')
     logger.info("After model context")
 
-    _ = [json.loads(lr) for lr in caplog.text.strip().split("\n")]
+    entries = [json.loads(line) for line in caplog.text.splitlines()]
+    assert entries[1]["message"] == 'worker_execution {"event": "returned"}'
     log_records = caplog.get_records("call")
     assert len(log_records) == 3
 

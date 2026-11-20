@@ -1,13 +1,14 @@
 from typing import Any
 from collections.abc import Sequence
 import logging
+import re
 
 import onnx
 from onnx import helper
 import onnxruntime as ort
 
 from mlserver.codecs.numpy import to_datatype
-from mlserver.errors import ModelValidationError
+from mlserver.errors import ModelLoadError, ModelValidationError
 from mlserver.types import Datatype, MetadataTensor
 
 from .settings import OnnxSettings
@@ -224,6 +225,17 @@ def _get_provider_options(
         )
 
     return provider_options
+
+
+def _cuda_device_id(value: Any) -> int:
+    # ORT accepts a signed C int in decimal, including leading zeros and -0.
+    if isinstance(value, str) and re.fullmatch(r"[0-9]+|-0+", value):
+        digits = value.lstrip("-0") or "0"
+        if len(digits) <= 10:
+            value = int(digits)
+    if type(value) is not int or not 0 <= value <= 2**31 - 1:
+        raise ModelLoadError("CUDA device_id must be a non-negative integer")
+    return value
 
 
 def _onnx_elem_type_to_datatype(elem_type: int) -> Datatype:

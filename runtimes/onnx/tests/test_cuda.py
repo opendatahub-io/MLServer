@@ -13,6 +13,8 @@ import pytest
 
 import onnxruntime as ort
 
+from mlserver.errors import ModelLoadError
+from mlserver.registry import MultiModelRegistry
 from mlserver.settings import ModelSettings, ModelParameters
 from mlserver.types import Datatype, InferenceRequest, RequestInput
 
@@ -238,6 +240,55 @@ async def test_invalid_device_id_falls_back_to_cpu(model_uri: str):
 # ---------------------------------------------------------------------------
 # CUDA-only (no CPU fallback)
 # ---------------------------------------------------------------------------
+
+
+async def test_gpu_required_device_unavailable(model_settings: ModelSettings) -> None:
+    assert model_settings.parameters is not None
+    model_settings.parameters.extra = {
+        "providers": ["CUDAExecutionProvider"],
+        "provider_options": {"device_id": 999},
+        "session_config_entries": {"session.disable_cpu_ep_fallback": "1"},
+    }
+    registry = MultiModelRegistry()
+    with pytest.raises(ModelLoadError):
+        await registry.load(model_settings)
+    assert await registry.get_models() == []
+
+
+async def test_rejected_graph_replacement_preserves_ready_model(
+    model_settings: ModelSettings,
+    inference_request: InferenceRequest,
+    cuda_device_id: int,
+) -> None:
+    assert model_settings.parameters is not None
+    model_settings.parameters.extra = {
+        "providers": ["CUDAExecutionProvider"] * 2,
+        "provider_options": [
+            {"device_id": cuda_device_id},
+            {"device_id": str(cuda_device_id), "enable_cuda_graph": "0"},
+        ],
+        "session_config_entries": {"session.disable_cpu_ep_fallback": "1"},
+    }
+    registry = MultiModelRegistry()
+    original = await registry.load(model_settings)
+    try:
+        replacement = model_settings.model_copy(deep=True)
+        assert (
+            replacement.parameters is not None
+            and replacement.parameters.extra is not None
+        )
+        replacement.parameters.extra["provider_options"][1]["enable_cuda_graph"] = "1"
+        with pytest.raises(ModelLoadError, match="enable_cuda_graph"):
+            await registry.load(replacement)
+        assert await registry.get_model(model_settings.name) is original
+        assert original.ready
+        reply = await original.predict(inference_request)
+        np.testing.assert_allclose(
+            reply.outputs[0].data.root,
+            np.asarray(inference_request.inputs[0].data.root) + 1,
+        )
+    finally:
+        await registry.unload(model_settings.name)
 
 
 async def test_cuda_only_provider(model_uri: str):

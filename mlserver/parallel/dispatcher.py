@@ -57,7 +57,8 @@ class AsyncResponses:
 
         return Histogram(
             QUEUE_METRIC_NAME,
-            "counter of request queue size for workers",
+            "Number of registered response waiters at scheduling time, including "
+            "model updates.",
             registry=REGISTRY,
         )
 

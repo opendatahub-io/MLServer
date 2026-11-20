@@ -34,6 +34,7 @@ from .utils import (
     _apply_session_config_entries,
     _build_run_options,
     _build_session_options,
+    _cuda_device_id,
     _extract_metadata,
     _get_provider_options,
     _get_providers,
@@ -103,7 +104,20 @@ class OnnxModel(MLModel):
         session_options = _apply_session_config_entries(
             session_options, self._onnx_settings
         )
-        cuda_device_id = 0
+        cuda_entries = [
+            options
+            for provider, options in zip(providers, provider_options or [])
+            if provider == "CUDAExecutionProvider"
+        ]
+        # ORT uses only the first entry for a repeated execution provider.
+        first_cuda = cuda_entries[0] if cuda_entries else {}
+        cuda_device_id = _cuda_device_id(first_cuda.get("device_id", 0))
+        for entry in cuda_entries[1:]:
+            if (
+                "device_id" in entry
+                and _cuda_device_id(entry["device_id"]) != cuda_device_id
+            ):
+                raise ModelLoadError("Conflicting CUDA device_id selections")
         if self._onnx_settings.cuda_graph or self._onnx_settings.cuda_blocking_sync:
             if providers[0] != "CUDAExecutionProvider":
                 raise ModelLoadError(
@@ -121,17 +135,6 @@ class OnnxModel(MLModel):
                 )
             ]
             cuda_options = provider_options[0]
-            device = cuda_options.get("device_id", 0)
-            if type(device) is not int and not isinstance(device, str):
-                raise ModelLoadError("CUDA device_id must be a non-negative integer")
-            try:
-                cuda_device_id = int(device)
-            except ValueError as exc:
-                raise ModelLoadError(
-                    "CUDA device_id must be a non-negative integer"
-                ) from exc
-            if cuda_device_id < 0:
-                raise ModelLoadError("CUDA device_id must be a non-negative integer")
             if self._onnx_settings.cuda_graph:
                 if self._onnx_settings.run_options:
                     raise ModelLoadError(
@@ -142,6 +145,30 @@ class OnnxModel(MLModel):
                         "cuda_graph requires provider enable_cuda_graph=1"
                     )
                 cuda_options["enable_cuda_graph"] = "1"
+        later_graph = {
+            str(entry["enable_cuda_graph"])
+            for entry in cuda_entries[1:]
+            if "enable_cuda_graph" in entry
+        }
+        allowed_graph = set()
+        if later_graph:
+            # Only reject definite contradictions before changing shared CUDA flags.
+            # ORT resolves the first provider's effective setting at session creation.
+            enabled = {"1", "True", "true"}
+            disabled = {"0", "False", "false"}
+            first_graph = (
+                "1"
+                if self._onnx_settings.cuda_graph
+                else str(first_cuda.get("enable_cuda_graph"))
+            )
+            if later_graph <= enabled and first_graph not in disabled:
+                allowed_graph = enabled
+            elif later_graph <= disabled and first_graph not in enabled:
+                allowed_graph = disabled
+            else:
+                raise ModelLoadError(
+                    "Invalid or conflicting CUDA enable_cuda_graph selections"
+                )
         if self._onnx_settings.cuda_graph:
             # An empty RunOptions mapping requests defaults. The graph session
             # uses its fixed binding path and accepts only the default None.
@@ -173,6 +200,16 @@ class OnnxModel(MLModel):
                 providers=providers,
                 provider_options=provider_options,
             )
+            if allowed_graph:
+                active = session.get_provider_options().get("CUDAExecutionProvider", {})
+                graph = active.get(
+                    "enable_cuda_graph",
+                    first_cuda.get("enable_cuda_graph", self._onnx_settings.cuda_graph),
+                )
+                if graph is not None and str(graph) not in allowed_graph:
+                    raise ModelLoadError(
+                        "Invalid or conflicting CUDA enable_cuda_graph selections"
+                    )
             if wait is not None:
                 actual = session.get_providers()
                 if not actual or actual[0] != "CUDAExecutionProvider":

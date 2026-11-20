@@ -676,6 +676,7 @@ class InferencePool:
         self, dispatch: asyncio.Future, message: ModelUpdateMessage
     ) -> None:
         self._quarantined_workers.update(self._dispatcher._ready_workers)
+        logger.debug("Starting model-update recovery on %s", self.name)
         self._dispatcher._ready_workers.clear()
         self._dispatcher._reset_round_robin()
         previous = self._recovery_task
@@ -729,6 +730,7 @@ class InferencePool:
                 if self._workers.get(pid) is worker:
                     self._dispatcher.on_worker_ready(worker)
             self._quarantined_workers.clear()
+            logger.debug("Completed model-update recovery on %s", self.name)
 
     def has_model(self, model_settings: ModelSettings) -> bool:
         return self._worker_registry.has_model(model_settings)

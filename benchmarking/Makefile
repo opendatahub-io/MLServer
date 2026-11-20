@@ -25,3 +25,8 @@ benchmark-grpc:
 		-e MLSERVER_HTTP_PORT=8080 \
 		-e MLSERVER_GRPC_PORT=8081 \
 		scenarios/inference-grpc.js
+
+benchmark-mms-rest benchmark-mms-grpc:
+	k6 run -e PROTOCOL=$(patsubst benchmark-mms-%,%,$@) \
+		-e MLSERVER_HOST=localhost -e MLSERVER_HTTP_PORT=8080 -e MLSERVER_GRPC_PORT=8081 \
+		scenarios/mms.js

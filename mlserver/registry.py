@@ -213,6 +213,7 @@ class SingleModelRegistry:
         )
 
         with model_context(model_settings):
+            logger.debug("Preparing model %r version %r", new_model.name, version)
             new_model = await self._load_model(
                 new_model, previous_loaded_model is not None
             )
@@ -240,6 +241,7 @@ class SingleModelRegistry:
             old.ready = False
         self._refresh_default()
         self._register(model)
+        logger.debug("Published model %r version %r", model.name, model.version)
         cleanup = [self._start_cleanup(old) for old in retired]
         results = await asyncio.gather(
             *(asyncio.shield(task) for task in cleanup), return_exceptions=True
@@ -486,6 +488,9 @@ class SingleModelRegistry:
     ) -> asyncio.Task:
         task = self._cleanup_tasks.get(model)
         if task is None:
+            logger.debug(
+                "Cleanup pending for model %r version %r", model.name, model.version
+            )
             if preparation is not None:
                 self._cleanup_preparations[model] = preparation
             preparation = self._cleanup_preparations.get(model)
@@ -496,6 +501,9 @@ class SingleModelRegistry:
 
     def _cleanup_done(self, model: MLModel, task: asyncio.Task) -> None:
         if not task.cancelled() and task.exception() is None:
+            logger.debug(
+                "Cleanup completed for model %r version %r", model.name, model.version
+            )
             self._cleanup_tasks.pop(model, None)
             self._cleanup_preparations.pop(model, None)
         else:

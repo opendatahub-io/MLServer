@@ -447,6 +447,18 @@ async def test_blocking_wait_failure_is_a_load_error_without_verified_receipt(
             "providers": ["CUDAExecutionProvider"],
             "provider_options": {"device_id": True},
         },
+        {
+            "providers": ["CUDAExecutionProvider"] * 2,
+            "provider_options": [
+                {"enable_cuda_graph": "0"},
+                {"enable_cuda_graph": "1"},
+            ],
+        },
+        {
+            "providers": ["CUDAExecutionProvider"] * 2,
+            "provider_options": [{}, {"enable_cuda_graph": "0"}],
+            "cuda_graph": True,
+        },
     ],
 )
 async def test_blocking_configuration_is_validated_before_cuda_calls(
@@ -457,3 +469,26 @@ async def test_blocking_configuration_is_validated_before_cuda_calls(
         await model.load()
     wait_policy.configure.assert_not_called()
     loading.constructor.assert_not_called()
+
+
+@pytest.mark.parametrize("effective", ["0", "1"])
+async def test_duplicate_graph_option_checks_effective_session_default(
+    loading, effective
+):
+    model = OnnxModel(
+        settings(
+            {
+                "providers": ["CUDAExecutionProvider"] * 2,
+                "provider_options": [{}, {"enable_cuda_graph": "1"}],
+            }
+        )
+    )
+    loading.session.get_provider_options.return_value = {
+        "CUDAExecutionProvider": {"enable_cuda_graph": effective}
+    }
+    if effective == "1":
+        assert await model.load()
+    else:
+        with pytest.raises(ModelLoadError, match="enable_cuda_graph"):
+            await model.load()
+    loading.constructor.assert_called_once()
