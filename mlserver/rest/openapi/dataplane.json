@@ -4,9 +4,9 @@
     "title": "Data Plane",
     "version": "2.0",
     "contact": {
-      "name": "Seldon Technologies Ltd.",
-      "url": "https://www.seldon.io/",
-      "email": "hello@seldon.io"
+      "name": "The KServe Authors",
+      "url": "https://kserve.github.io/",
+      "email": "kserve-maintainers@lists.cncf.io"
     },
     "description": "REST protocol to interact with inference servers.",
     "license": {

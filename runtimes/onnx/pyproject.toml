@@ -5,6 +5,7 @@ description = "ONNX runtime for MLServer"
 authors = [
     "Syed Nomaan Ali (Snomaan6846) <nomaan.syed.ali@gmail.com>",
     "Syed Nomaan Ali (Red Hat, Inc.) <syedali@redhat.com>",
+    "The KServe Authors",
 ]
 license = "Apache-2.0"
 readme = "README.md"

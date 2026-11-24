@@ -47,7 +47,7 @@ class WorkerError(MLServerError):
     All stacktrace details will be hidden, and the original class won't be
     returned. This is to avoid issues with custom exceptions, like:
 
-        https://github.com/SeldonIO/MLServer/issues/881
+        https://github.com/opendatahub-io/MLServer/issues/881
     """
 
     def __init__(self, exc: BaseException):

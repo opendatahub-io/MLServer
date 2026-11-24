@@ -4,9 +4,9 @@
     "title": "Model Repository",
     "version": "2.0",
     "contact": {
-      "name": "Seldon Technologies Ltd.",
-      "url": "https://www.seldon.io/",
-      "email": "hello@seldon.io"
+      "name": "The KServe Authors",
+      "url": "https://kserve.github.io/",
+      "email": "kserve-maintainers@lists.cncf.io"
     },
     "description": "The Model Repository API allows the user to manage the models running in the inference server. That is, querying the currently available models, load them and unload them."
   },
