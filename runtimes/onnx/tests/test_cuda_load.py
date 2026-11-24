@@ -129,7 +129,7 @@ def test_graph_setting_env_and_file_precedence(monkeypatch, file_value):
 async def test_graph_options_are_set_before_constructor_and_wrap_before_metadata(
     loading,
 ):
-    original = {"device_id": "2", "use_tf32": "0"}
+    original = {"device_id": "2", "use_tf32": "0", "enable_cuda_graph": True}
     model = OnnxModel(
         settings(
             {
@@ -146,7 +146,7 @@ async def test_graph_options_are_set_before_constructor_and_wrap_before_metadata
         {"device_id": "2", "use_tf32": "0", "enable_cuda_graph": "1"},
         {},
     ]
-    assert original == {"device_id": "2", "use_tf32": "0"}
+    assert original == {"device_id": "2", "use_tf32": "0", "enable_cuda_graph": True}
     assert model._onnx_settings.provider_options == [original, {}]
     loading.wrap.assert_called_once_with(loading.session, 2)
     assert (
@@ -183,6 +183,46 @@ async def test_graph_accepts_only_default_run_options(loading, options):
     )
     assert await model.load()
     assert model._run_options is None
+
+
+@pytest.mark.parametrize("source", ["model", "environment"])
+@pytest.mark.parametrize("policy, native", [(False, "1"), (True, "0")])
+async def test_explicit_graph_conflict_fails_before_cuda_setup(
+    loading, wait_policy, monkeypatch, source, policy, native
+):
+    extra = {
+        "providers": ["CUDAExecutionProvider"],
+        "provider_options": {"enable_cuda_graph": native},
+        "cuda_blocking_sync": True,
+    }
+    if source == "model":
+        extra["cuda_graph"] = policy
+    else:
+        monkeypatch.setenv("MLSERVER_MODEL_ONNX_CUDA_GRAPH", str(policy))
+    with pytest.raises(ModelLoadError, match="conflicting CUDA enable_cuda_graph"):
+        await OnnxModel(settings(extra)).load()
+    wait_policy.configure.assert_not_called()
+    loading.constructor.assert_not_called()
+
+
+@pytest.mark.parametrize("options", [None, {}, {"log_severity_level": 3}])
+async def test_provider_graph_run_options(loading, options):
+    model = OnnxModel(
+        settings(
+            {
+                "providers": ["CUDAExecutionProvider"],
+                "provider_options": {"device_id": 2, "enable_cuda_graph": "1"},
+                "run_options": options,
+            }
+        )
+    )
+    if options:
+        with pytest.raises(ModelLoadError, match="RunOptions"):
+            await model.load()
+    else:
+        assert await model.load()
+        loading.wrap.assert_called_once_with(loading.session, 2)
+        assert model._run_options is None
 
 
 @pytest.mark.parametrize(
@@ -234,6 +274,7 @@ async def test_unsupported_active_session_is_a_model_load_error(
     monkeypatch.setattr(runtime, "CudaGraphSession", cuda.CudaGraphSession)
     if failure == "fallback":
         loading.session.get_providers.return_value = ["CPUExecutionProvider"]
+        loading.session.get_provider_options.return_value = {"CPUExecutionProvider": {}}
     elif failure == "dynamic":
         loading.session.get_inputs.return_value[0].shape = [None, 3]
     else:
@@ -266,6 +307,7 @@ async def test_graph_keeps_metadata_prediction_output_order_and_validation(loadi
 
 async def test_graph_disabled_keeps_original_run_options_passthrough(loading):
     loading.session.get_providers.return_value = ["CPUExecutionProvider"]
+    loading.session.get_provider_options.return_value = {"CPUExecutionProvider": {}}
     model = OnnxModel(
         settings(
             {
@@ -393,6 +435,7 @@ async def test_combined_wait_is_verified_before_graph_wrapper(loading, wait_poli
 
 async def test_default_cpu_load_does_not_configure_or_read_cuda(loading, wait_policy):
     loading.session.get_providers.return_value = ["CPUExecutionProvider"]
+    loading.session.get_provider_options.return_value = {"CPUExecutionProvider": {}}
     model = OnnxModel(settings({}))
     assert await model.load()
     wait_policy.configure.assert_not_called()
@@ -419,9 +462,13 @@ async def test_blocking_wait_failure_is_a_load_error_without_verified_receipt(
     if failure == "configure":
         wait_policy.configure.side_effect = ModelLoadError("missing CUDA runtime")
     elif failure == "readback":
+        loading.session.get_provider_options.return_value = {
+            "CUDAExecutionProvider": {"device_id": "2", "enable_cuda_graph": "0"}
+        }
         wait_policy.read.side_effect = ModelLoadError("flags were changed")
     elif failure == "fallback":
         loading.session.get_providers.return_value = ["CPUExecutionProvider"]
+        loading.session.get_provider_options.return_value = {"CPUExecutionProvider": {}}
     elif failure == "device":
         loading.session.get_provider_options.return_value = {
             "CUDAExecutionProvider": {"device_id": "0"}
@@ -445,7 +492,28 @@ async def test_blocking_wait_failure_is_a_load_error_without_verified_receipt(
         {"providers": ["CUDAExecutionProvider"], "provider_options": {"device_id": -1}},
         {
             "providers": ["CUDAExecutionProvider"],
+            "provider_options": {"enable_cuda_graph": "1"},
+            "run_options": {"log_severity_level": 3},
+        },
+        {
+            "providers": ["CUDAExecutionProvider"],
+            "provider_options": {"enable_cuda_graph": "None"},
+        },
+        {
+            "providers": ["CUDAExecutionProvider"],
             "provider_options": {"device_id": True},
+        },
+        {
+            "providers": ["CUDAExecutionProvider"] * 2,
+            "provider_options": [
+                {"enable_cuda_graph": "0"},
+                {"enable_cuda_graph": "1"},
+            ],
+        },
+        {
+            "providers": ["CUDAExecutionProvider"] * 2,
+            "provider_options": [{}, {"enable_cuda_graph": "0"}],
+            "cuda_graph": True,
         },
     ],
 )
@@ -457,3 +525,26 @@ async def test_blocking_configuration_is_validated_before_cuda_calls(
         await model.load()
     wait_policy.configure.assert_not_called()
     loading.constructor.assert_not_called()
+
+
+@pytest.mark.parametrize("effective", ["0", "1"])
+async def test_duplicate_graph_option_checks_effective_session_default(
+    loading, effective
+):
+    model = OnnxModel(
+        settings(
+            {
+                "providers": ["CUDAExecutionProvider"] * 2,
+                "provider_options": [{}, {"enable_cuda_graph": "0"}],
+            }
+        )
+    )
+    loading.session.get_provider_options.return_value = {
+        "CUDAExecutionProvider": {"enable_cuda_graph": effective}
+    }
+    if effective == "0":
+        assert await model.load()
+    else:
+        with pytest.raises(ModelLoadError, match="conflicting CUDA enable_cuda_graph"):
+            await model.load()
+    loading.constructor.assert_called_once()

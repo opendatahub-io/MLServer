@@ -415,6 +415,12 @@ def pytest_configure(config):
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
+        "--cuda-device-id",
+        type=int,
+        default=0,
+        help="Worker-visible ordinal for CUDA execution profile and policy tests.",
+    )
+    parser.addoption(
         "--require-cuda",
         action="store_true",
         help="Require CUDA test coverage; missing or skipped CUDA tests fail the run.",
@@ -441,3 +447,8 @@ def pytest_runtest_makereport(item: pytest.Item) -> Generator[None, Any, None]:
         # expose missing hardware/libraries instead of passing without coverage.
         report.outcome = "failed"
         report.longrepr = f"{item.nodeid}: CUDA test skipped with --require-cuda"
+
+
+@pytest.fixture
+def cuda_device_id(pytestconfig: pytest.Config) -> int:
+    return pytestconfig.getoption("--cuda-device-id")

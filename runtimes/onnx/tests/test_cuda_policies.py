@@ -5,6 +5,8 @@ import onnx
 from onnx import TensorProto, helper, numpy_helper
 import pytest
 
+from mlserver.errors import ModelLoadError
+from mlserver.registry import MultiModelRegistry
 from mlserver.settings import ModelParameters, ModelSettings
 from mlserver.types import InferenceRequest, RequestInput, RequestOutput
 from mlserver_onnx import OnnxModel
@@ -43,10 +45,37 @@ def fixed_cuda_model_uri(tmp_path) -> str:
     return str(path)
 
 
-@pytest.mark.parametrize("graph", [False, True])
+async def test_provider_graph_rejects_dynamic_input_before_publication(
+    model_settings: ModelSettings, cuda_device_id: int
+) -> None:
+    assert model_settings.parameters is not None
+    model_settings.parameters.extra = {
+        "providers": ["CUDAExecutionProvider"],
+        "provider_options": {"device_id": cuda_device_id, "enable_cuda_graph": "1"},
+        "session_config_entries": {"session.disable_cpu_ep_fallback": "1"},
+    }
+    registry = MultiModelRegistry()
+    with pytest.raises(ModelLoadError, match="fixed-shape FP32"):
+        await registry.load(model_settings)
+    assert await registry.get_models() == []
+
+
+@pytest.mark.parametrize(
+    "graph_settings, graph_options, replay",
+    [
+        pytest.param({"cuda_graph": False}, {}, False, id="off"),
+        pytest.param({"cuda_graph": True}, {}, True, id="mlserver"),
+        pytest.param({}, {"enable_cuda_graph": "1"}, True, id="provider"),
+    ],
+)
 @pytest.mark.parametrize("blocking", [False, True])
 async def test_cuda_policies_replay_fresh_inputs_and_preserve_outputs(
-    fixed_cuda_model_uri: str, graph: bool, blocking: bool
+    fixed_cuda_model_uri: str,
+    graph_settings: dict[str, bool],
+    graph_options: dict[str, str],
+    replay: bool,
+    blocking: bool,
+    cuda_device_id: int,
 ) -> None:
     model = OnnxModel(
         ModelSettings(
@@ -56,8 +85,10 @@ async def test_cuda_policies_replay_fresh_inputs_and_preserve_outputs(
                 uri=fixed_cuda_model_uri,
                 extra={
                     "providers": ["CUDAExecutionProvider"],
-                    "provider_options": [{"device_id": "0", "use_tf32": "0"}],
-                    "cuda_graph": graph,
+                    "provider_options": [
+                        {"device_id": cuda_device_id, "use_tf32": "0", **graph_options}
+                    ],
+                    **graph_settings,
                     "cuda_blocking_sync": blocking,
                 },
             ),
@@ -66,13 +97,15 @@ async def test_cuda_policies_replay_fresh_inputs_and_preserve_outputs(
     assert await model.load()
     try:
         assert model._model.get_providers()[0] == "CUDAExecutionProvider"
-        assert isinstance(model._model, CudaGraphSession) == graph
+        options = model._model.get_provider_options()["CUDAExecutionProvider"]
+        assert int(options["device_id"]) == cuda_device_id
+        assert isinstance(model._model, CudaGraphSession) == replay
         if blocking:
             receipt = model._cuda_wait_policy
             assert receipt is not None
             assert receipt["before_session_flags"] & 7 == 4
             assert receipt["after_session_flags"] & 7 == 4
-            assert read_device_flags(receipt["library"], 0) & 7 == 4
+            assert read_device_flags(receipt["library"], cuda_device_id) & 7 == 4
         else:
             assert model._cuda_wait_policy is None
 

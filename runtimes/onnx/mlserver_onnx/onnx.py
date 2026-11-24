@@ -34,6 +34,8 @@ from .utils import (
     _apply_session_config_entries,
     _build_run_options,
     _build_session_options,
+    _cuda_device_id,
+    _cuda_graph_enabled,
     _extract_metadata,
     _get_provider_options,
     _get_providers,
@@ -103,13 +105,43 @@ class OnnxModel(MLModel):
         session_options = _apply_session_config_entries(
             session_options, self._onnx_settings
         )
-        cuda_device_id = 0
-        if self._onnx_settings.cuda_graph or self._onnx_settings.cuda_blocking_sync:
+        cuda_entries = [
+            options
+            for provider, options in zip(providers, provider_options or [])
+            if provider == "CUDAExecutionProvider"
+        ]
+        # ORT uses only the first entry for a repeated execution provider.
+        first_cuda = cuda_entries[0] if cuda_entries else {}
+        requested_graph = {
+            _cuda_graph_enabled(entry["enable_cuda_graph"])
+            for entry in cuda_entries
+            if "enable_cuda_graph" in entry
+        }
+        require_graph = self._onnx_settings.cuda_graph
+        if "cuda_graph" in self._onnx_settings.model_fields_set:
+            requested_graph.add(require_graph)
+        if len(requested_graph) > 1:
+            raise ModelLoadError(
+                "Invalid or conflicting CUDA enable_cuda_graph selections"
+            )
+        cuda_device_id = _cuda_device_id(first_cuda.get("device_id", 0))
+        for entry in cuda_entries[1:]:
+            if (
+                "device_id" in entry
+                and _cuda_device_id(entry["device_id"]) != cuda_device_id
+            ):
+                raise ModelLoadError("Conflicting CUDA device_id selections")
+        if require_graph or self._onnx_settings.cuda_blocking_sync:
             if providers[0] != "CUDAExecutionProvider":
                 raise ModelLoadError(
                     "CUDA graph replay and blocking synchronization require "
                     "CUDAExecutionProvider first"
                 )
+            if True in requested_graph and self._onnx_settings.run_options:
+                raise ModelLoadError(
+                    "cuda_graph does not support configured RunOptions"
+                )
+        if require_graph:
             # Provider dictionaries may belong to model settings. Copy before
             # applying CUDA policies so loading does not rewrite model settings.
             provider_options = [
@@ -120,34 +152,8 @@ class OnnxModel(MLModel):
                     else [{} for _ in providers]
                 )
             ]
-            cuda_options = provider_options[0]
-            device = cuda_options.get("device_id", 0)
-            if type(device) is not int and not isinstance(device, str):
-                raise ModelLoadError("CUDA device_id must be a non-negative integer")
-            try:
-                cuda_device_id = int(device)
-            except ValueError as exc:
-                raise ModelLoadError(
-                    "CUDA device_id must be a non-negative integer"
-                ) from exc
-            if cuda_device_id < 0:
-                raise ModelLoadError("CUDA device_id must be a non-negative integer")
-            if self._onnx_settings.cuda_graph:
-                if self._onnx_settings.run_options:
-                    raise ModelLoadError(
-                        "cuda_graph does not support configured RunOptions"
-                    )
-                if str(cuda_options.get("enable_cuda_graph", "1")) != "1":
-                    raise ModelLoadError(
-                        "cuda_graph requires provider enable_cuda_graph=1"
-                    )
-                cuda_options["enable_cuda_graph"] = "1"
-        if self._onnx_settings.cuda_graph:
-            # An empty RunOptions mapping requests defaults. The graph session
-            # uses its fixed binding path and accepts only the default None.
-            self._run_options = None
-        else:
-            self._run_options = _build_run_options(self._onnx_settings)
+            provider_options[0]["enable_cuda_graph"] = "1"
+        run_options = _build_run_options(self._onnx_settings)
         logger.debug(
             "ONNX runtime options for model '%s': providers=%s, provider_options=%s, "
             "session_options=%s, run_options=%s",
@@ -155,7 +161,7 @@ class OnnxModel(MLModel):
             providers,
             provider_options,
             session_options,
-            self._run_options,
+            run_options,
         )
 
         self._cuda_wait_policy = None
@@ -173,14 +179,30 @@ class OnnxModel(MLModel):
                 providers=providers,
                 provider_options=provider_options,
             )
+            active_providers = session.get_providers()
+            active_cuda = session.get_provider_options().get(
+                "CUDAExecutionProvider", {}
+            )
+            # With CPU fallback, ORT has no effective CUDA options to report.
+            graph = _cuda_graph_enabled(
+                active_cuda.get(
+                    "enable_cuda_graph",
+                    first_cuda.get("enable_cuda_graph", require_graph),
+                )
+            )
+            if requested_graph and graph not in requested_graph:
+                raise ModelLoadError(
+                    "Invalid or conflicting CUDA enable_cuda_graph selections"
+                )
             if wait is not None:
-                actual = session.get_providers()
-                if not actual or actual[0] != "CUDAExecutionProvider":
+                if (
+                    not active_providers
+                    or active_providers[0] != "CUDAExecutionProvider"
+                ):
                     raise ModelLoadError(
                         "CUDA blocking synchronization requires an active CUDA provider"
                     )
-                actual_options = session.get_provider_options()["CUDAExecutionProvider"]
-                if str(actual_options.get("device_id")) != str(cuda_device_id):
+                if str(active_cuda.get("device_id")) != str(cuda_device_id):
                     raise ModelLoadError("CUDA session uses a different device")
                 self._cuda_wait_policy = {
                     **wait,
@@ -193,17 +215,23 @@ class OnnxModel(MLModel):
                     self.name,
                     self._cuda_wait_policy,
                 )
-            self._model = (
-                CudaGraphSession(session, cuda_device_id)
-                if self._onnx_settings.cuda_graph
-                else session
+            # A provider-only graph request can still resolve to a CPU session.
+            replay = require_graph or (
+                graph and "CUDAExecutionProvider" in active_providers
             )
+            if replay and self._onnx_settings.run_options:
+                raise ModelLoadError(
+                    "cuda_graph does not support configured RunOptions"
+                )
+            self._model = (
+                CudaGraphSession(session, cuda_device_id) if replay else session
+            )
+            self._run_options = None if replay else run_options
         except Exception as exc:
             raise ModelLoadError(
                 f"Failed to load ONNX model from '{model_uri}': {exc}"
             ) from exc
 
-        active_providers = self._model.get_providers()
         logger.info(
             "ONNX model '%s' loaded with execution providers: %s",
             self.name,

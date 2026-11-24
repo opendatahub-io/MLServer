@@ -10,10 +10,9 @@ runtimes](./custom).
 
 ## Default Metrics
 
-By default, MLServer will expose metrics around inference requests (count and
-error rate) and the status of its internal requests queues.
-These internal queues are used for [adaptive batching](./adaptive-batching) and
-[communication with the inference workers](./parallel-inference).
+MLServer exposes metrics for inference outcomes, cleanup failures,
+[adaptive batching](./adaptive-batching), and requests awaiting
+[worker responses](./parallel-inference).
 
 | Metric Name                     | Description                                                         |
 | ------------------------------- | ------------------------------------------------------------------- |
@@ -22,7 +21,7 @@ These internal queues are used for [adaptive batching](./adaptive-batching) and
 | `model_cleanup_failures_total`  | Number of failed model cleanup operations.                          |
 | `pool_cleanup_failures_total`   | Number of failed inference pool cleanup operations.                 |
 | `batch_request_queue`           | Queue size for the [adaptive batching](./adaptive-batching) queue.  |
-| `parallel_request_queue`        | Queue size for the [inference workers](./parallel-inference) queue. |
+| `parallel_request_queue`        | Histogram of callers waiting for [worker](./parallel-inference) responses when a message is scheduled, including model updates. |
 
 ### REST Server Metrics
 

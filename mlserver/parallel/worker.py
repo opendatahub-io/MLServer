@@ -1,6 +1,10 @@
 import asyncio
+import json
+import logging
+import os
 import select
 import signal
+from time import monotonic_ns
 
 from asyncio import Task, CancelledError
 from collections.abc import Awaitable, Callable, Sequence
@@ -19,6 +23,7 @@ from ..logging import configure_logger
 from ..settings import Settings
 from ..metrics import configure_metrics
 from ..context import model_context
+from ..types import InferenceRequest
 from ..env import Environment
 from ..errors import ModelNotFound
 
@@ -35,6 +40,8 @@ from .errors import WorkerError
 IGNORED_SIGNALS = [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT]
 
 WorkerModelHook = Callable[[MLModel], Awaitable[MLModel]]
+
+_execution_logger = logging.getLogger("mlserver.parallel.execution")
 
 
 def _noop():
@@ -251,9 +258,39 @@ class Worker(Process):
 
             method = getattr(model, request.method_name)
             with model_context(model.settings):
-                return_value = await method(
-                    *request.method_args, **request.method_kwargs
-                )
+                if (
+                    _execution_logger.isEnabledFor(logging.DEBUG)
+                    and request.method_name == "predict"
+                    and request.method_args
+                    and isinstance(request.method_args[0], InferenceRequest)
+                ):
+                    identity = {
+                        "message": request.id,
+                        "request": request.method_args[0].id,
+                        "model": model.name,
+                        "version": model.version,
+                        "pid": os.getpid(),
+                    }
+
+                    def observe(event: str) -> None:
+                        _execution_logger.debug(
+                            "worker_execution %s",
+                            json.dumps(dict(identity, event=event, ns=monotonic_ns())),
+                        )
+
+                    observe("started")
+                    try:
+                        return_value = await method(
+                            *request.method_args, **request.method_kwargs
+                        )
+                    except BaseException:
+                        observe("raised")
+                        raise
+                    observe("returned")
+                else:
+                    return_value = await method(
+                        *request.method_args, **request.method_kwargs
+                    )
             return ModelResponseMessage(id=request.id, return_value=return_value)
         except (Exception, CancelledError) as e:
             logger.exception(

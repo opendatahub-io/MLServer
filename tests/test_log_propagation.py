@@ -368,6 +368,7 @@ class TestOnnxConfigureFrameworkLogger:
         )
         session = MagicMock()
         session.get_providers.return_value = ["CPUExecutionProvider"]
+        session.get_provider_options.return_value = {"CPUExecutionProvider": {}}
         session.get_inputs.return_value = [SimpleNamespace(name="input")]
         session.get_outputs.return_value = [SimpleNamespace(name="output")]
         constructor = mocker.patch(
@@ -411,6 +412,10 @@ class TestOnnxProviderFallbackLogging:
             input_names = ["input_0"]
         mock_session = MagicMock()
         mock_session.get_providers.return_value = active_providers
+        provider_options = {provider: {} for provider in active_providers}
+        if "CUDAExecutionProvider" in provider_options:
+            provider_options["CUDAExecutionProvider"]["enable_cuda_graph"] = "0"
+        mock_session.get_provider_options.return_value = provider_options
         mock_inputs = []
         for name in input_names:
             inp = MagicMock()

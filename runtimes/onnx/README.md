@@ -238,8 +238,9 @@ list (passed to `InferenceSession` as a sequence of option dicts per the
 [ONNX Runtime API](https://onnxruntime.ai/docs/api/python/api_summary.html)).
 `session_options` maps directly to attributes on
 `onnxruntime.SessionOptions`. `session_config_entries` provides additional
-runtime keys via `SessionOptions.add_session_config_entry`. `run_options` maps
-to `onnxruntime.RunOptions` and is applied on every `session.run()` call.
+runtime keys via `SessionOptions.add_session_config_entry`. Ordinary inference,
+including CPU fallback, passes `run_options` to `session.run()`. For CUDA graph
+replay, omit `run_options` or set it to `{}`.
 
 ### GPU Acceleration (CUDA)
 
@@ -264,14 +265,40 @@ Then configure `CUDAExecutionProvider` in your model settings:
 }
 ```
 
-Listing `CPUExecutionProvider` as a fallback ensures the model loads even if
-CUDA is unavailable. The runtime logs a warning at load time if any requested
-provider was not activated — check server logs if GPU inference is not being
-used.
+This example allows a CPU-compatible model to serve when CUDA is unavailable.
+Settings that require CUDA, such as `cuda_graph: true`, cause loading to fail
+in that case. The runtime logs a warning if a requested provider is missing
+from the loaded session.
 
 The CUDA Docker images set the environment variable
 `MLSERVER_MODEL_ONNX_PROVIDERS='["CUDAExecutionProvider","CPUExecutionProvider"]'`
 by default, so no model-settings change is needed when using the pre-built image.
+
+### Execution profiles
+
+For CPU-only serving, select `["CPUExecutionProvider"]`. For GPU-required
+serving, configure these fields under `parameters.extra`:
+
+```json
+{
+  "providers": ["CUDAExecutionProvider"],
+  "provider_options": {"device_id": 0},
+  "session_config_entries": {"session.disable_cpu_ep_fallback": "1"}
+}
+```
+
+The ordinal refers to the devices visible inside each worker. A pod allocated
+one GPU ordinarily sees it as device zero. With CPU fallback permitted, a
+well-formed but unavailable ordinal can result in a CPU session. Malformed
+CUDA ordinals, invalid `enable_cuda_graph` values (including `null`), and
+conflicting device or graph selections in repeated CUDA entries fail loading.
+ONNX Runtime uses the first entry for a provider.
+MLServer rejects explicit graph-setting conflicts before configuring blocking
+synchronization. If the first CUDA entry relies on a default, MLServer checks
+a later explicit graph request against the effective setting during loading.
+
+For a mixed profile, list CUDA and CPU in priority order, identify the operators
+allowed on CPU, and check the operator trace alongside the expected outputs.
 
 ### Execution provider fields
 
@@ -281,7 +308,7 @@ by default, so no model-settings change is needed when using the pre-built image
 - `session_options`: low-level runtime options such as
   `intra_op_num_threads`, `inter_op_num_threads`, and graph optimization flags.
 - `session_config_entries`: string key/value entries added to the session config.
-- `run_options`: per-run settings such as `log_severity_level` and `tag`.
+- `run_options`: per-run settings such as `log_severity_level` and `logid`.
 
 ## Performance Tuning
 
@@ -353,7 +380,14 @@ the corresponding environment variables. For example,
 `MLSERVER_MODEL_ONNX_CUDA_GRAPH=true` enables replay for ONNX models unless
 overridden in their model settings.
 
-`cuda_graph` captures and replays GPU execution using persistent device buffers
+Set `cuda_graph: true` to require graph replay. To allow CPU fallback, you
+can instead set `enable_cuda_graph: "1"` in the CUDA provider options and
+leave `cuda_graph` unset. When CUDA activates graphs, either setting uses
+the same replay path. If CUDA is unavailable, the provider-only form follows
+the session's CPU fallback policy. If both graph settings are explicit, they
+must agree.
+
+MLServer captures and replays GPU execution using persistent device buffers
 to reduce host launch work. This path requires exactly one fixed-shape FP32
 input and fixed-shape FP32 outputs. Requests must supply contiguous FP32 input
 matching the model shape, and custom `run_options` are unsupported. The example
@@ -378,7 +412,7 @@ and transport settings are described in
 From the repository root, run the GPU validation suite serially:
 
 ```bash
-poetry run tox -c runtimes/onnx -e cuda-ci
+poetry run -- tox -c runtimes/onnx -e cuda-ci
 ```
 
 This environment installs the locked GPU dependencies and NVIDIA libraries with
@@ -386,6 +420,22 @@ Poetry. It requires an NVIDIA driver compatible with CUDA 12. The launcher sets
 the native library search path before starting pytest. Real-device tests cover
 graph capture/replay, changed request contents, independent response buffers,
 and blocking synchronization, both separately and together.
+
+The worker profile test checks known outputs, operator placement, and effective
+thread counts in two workers and after one worker restarts. To exercise a
+different visible ordinal in that test and the CUDA graph/blocking-wait policy
+tests, pass it through tox, for example on a two-device allocation:
+
+```sh
+poetry run -- tox -c runtimes/onnx -e cuda-ci -- --cuda-device-id=1
+```
+
+Record the pod's allocation and GPU identities with each qualification run.
+For a nonzero ordinal, also collect device-level evidence linking the worker's
+inference to the selected GPU. An operator trace identifies the execution
+provider but does not distinguish two GPUs using that provider.
+Run once on the allocation alone and again with the stated competing workload
+when qualifying sharing.
 
 `cuda-ci` uses `--require-cuda`: missing CUDA coverage or skipped CUDA tests fail
 the run. The existing `cuda` environment retains automatic skips for CPU-only
