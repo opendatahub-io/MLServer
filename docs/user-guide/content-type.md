@@ -135,6 +135,10 @@ Array, etc.):
   - {func}`encode_output() <mlserver.codecs.InputCodec.encode_output>`
   - {func}`decode_output() <mlserver.codecs.InputCodec.decode_output>`
 
+If you used the removed `encode()` or `decode()` codec aliases, use
+`encode_output()` and `decode_input()` on input codecs, or
+`encode_response()` and `decode_request()` on request codecs, respectively.
+
 Note that, these methods can also be used as helpers to **encode requests and
 decode responses on the client side**.
 This can help to abstract away from the user most of the details about the

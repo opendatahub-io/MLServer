@@ -873,14 +873,11 @@ class ModelSettings(BaseSettings):
         None,
         deprecated=True,
         description=(
-            "Use the `parallel_workers` field the server wide settings instead."
+            "Setting a worker count per model is deprecated. You can still set this "
+            "field to 0 or less to opt this model out of parallel inference and run "
+            "it in the main server process. Positive values and omission use the "
+            "server-level `parallel_workers` setting."
         ),
-    )
-
-    warm_workers: bool = Field(
-        False,
-        deprecated=True,
-        description="Inference workers will now always be `warmed up` at start time.",
     )
 
     # Adaptive Batching settings (disabled by default)

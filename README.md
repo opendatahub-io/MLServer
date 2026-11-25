@@ -317,7 +317,7 @@ follow the same versioning schema. To bump the version across all packages:
 make test
 
 # Run tests for a single file
-tox -e py3 -- tests/batch_processing/test_rest.py
+tox -e py3 -- tests/batching/test_adaptive.py
 ```
 
 See the [Onboarding Guide](./docs/engineering/onboarding.md) for full

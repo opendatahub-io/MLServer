@@ -161,7 +161,7 @@ class InferenceServicer(GRPCInferenceServiceServicer):
     ) -> pb.RepositoryIndexResponse:
         payload = RepositoryIndexRequestConverter.to_types(request)
         index = await self._model_repository_handlers.index(payload)
-        return RepositoryIndexResponseConverter.from_types(index)  # type: ignore
+        return RepositoryIndexResponseConverter.from_types(index)
 
     @handle_mlserver_error
     async def RepositoryModelLoad(

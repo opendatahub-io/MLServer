@@ -1,6 +1,5 @@
 import typing
 
-import numpy as np
 import pytest
 
 from datetime import datetime
@@ -14,7 +13,6 @@ from mlserver.codecs.base import (
     InputCodec,
     RequestCodec,
 )
-from mlserver.types import RequestInput
 
 
 @pytest.fixture
@@ -27,18 +25,6 @@ def codec_registry():
     registry.register_input_codec(DatetimeCodec.ContentType, DatetimeCodec)
 
     return registry
-
-
-def test_deprecated_methods(caplog):
-    request_input = RequestInput(
-        name="foo", shape=[3], data=[1, 2, 3], datatype="INT32"
-    )
-    expected = np.array([1, 2, 3])
-
-    decoded = NumpyCodec.decode(request_input)
-
-    assert any(["DEPRECATED" in rec.message for rec in caplog.records])
-    np.testing.assert_array_equal(decoded, expected)
 
 
 @pytest.mark.parametrize(

@@ -392,13 +392,9 @@ message InferTensorContents
 //
 // Messages for the Repository API
 //
-// NOTE: These messages used to exist previously on a different protobuf
-// definition. However, they have now been merged with the main
-// GRPCInferenceService.
-//
 
 
-// An model repository parameter value.
+// A model repository parameter value.
 message ModelRepositoryParameter
 {
   // The parameter value can be a string, an int64 or a boolean

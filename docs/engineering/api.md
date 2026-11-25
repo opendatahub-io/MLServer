@@ -302,6 +302,10 @@ service GRPCInferenceService {
 | `RepositoryModelLoad` | `RepositoryModelLoadRequest` | `RepositoryModelLoadResponse` | Load a model |
 | `RepositoryModelUnload` | `RepositoryModelUnloadRequest` | `RepositoryModelUnloadResponse` | Unload a model |
 
+Clients migrating from the removed standalone `ModelRepositoryService` should
+use `inference.GRPCInferenceService` and the repository messages in
+`dataplane.proto`.
+
 ### Raw Tensor Contents
 
 gRPC supports an optimized "raw" byte encoding for tensor data via `raw_input_contents` and `raw_output_contents`.
@@ -472,7 +476,7 @@ class MyModel(MLModel):
 | `parameters.content_type` | string | No | Default codec for this model |
 | `max_batch_size` | int | No | Adaptive batching max batch size |
 | `max_batch_time` | float | No | Adaptive batching max wait time (seconds) |
-| `parallel_workers` | int | No | Override server-level worker count |
+| `parallel_workers` | int | No | Setting a worker count per model is deprecated. Set to `0` or less to opt this model out of parallel inference and run it in the main server process. Positive values and omission use the server setting. |
 
 ### Environment Variables
 
@@ -482,7 +486,7 @@ All settings can be set via environment variables with the `MLSERVER_` prefix:
 MLSERVER_HTTP_PORT=9090
 MLSERVER_GRPC_PORT=9091
 MLSERVER_DEBUG=true
-MLSERVER_MODEL_PARALLEL_WORKERS=4
+MLSERVER_PARALLEL_WORKERS=4
 ```
 
 Model-specific settings use the `MLSERVER_MODEL_` prefix.

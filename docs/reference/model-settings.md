@@ -1,9 +1,17 @@
 # Model Settings
 
-In MLServer, each loaded model can be configured separately.
-This configuration will include model information (e.g. metadata about the
-accepted inputs), but also model-specific settings (e.g. number of [parallel
-workers](../user-guide/parallel-inference) to run inference).
+In MLServer, each loaded model can be configured separately. Model settings
+include metadata about accepted inputs and options such as adaptive batching.
+
+Set the number of [parallel workers](../user-guide/parallel-inference) in the
+server's `settings.json` or through `MLSERVER_PARALLEL_WORKERS`. Setting a worker
+count per model is deprecated. You can still set model-level `parallel_workers`
+to `0` or less to opt that model out of parallel inference and run it in the main
+server process. Positive values and omission use the server setting.
+
+For example, set `"parallel_workers": 0` in the `model-settings.json` of a model
+that needs its own `predict_stream()` implementation. This lets that model
+stream in the server process while other models use the worker pool.
 
 This configuration will usually be provided through a `model-settings.json`
 file which **sits next to the model artifacts**.

@@ -363,16 +363,11 @@ class InferencePoolRegistry:
     def _should_load_model(self, model_settings: ModelSettings):
         if model_settings.parallel_workers is not None:
             logger.warning(
-                "DEPRECATED!! The `parallel_workers` setting at the model-level "
-                "has now been deprecated and moved "
-                "to the top-level server "
-                "settings. "
-                "This field will be removed in MLServer 1.2.0. "
-                "To access the new field, you can either update the "
-                "`settings.json` file, or update the `MLSERVER_PARALLEL_WORKERS` "
-                "environment variable. "
-                f"The current value of the server-level's `parallel_workers` field is "
-                f"'{self._settings.parallel_workers}'."
+                "Setting a worker count per model via `parallel_workers` is "
+                "deprecated. You can still set this field to 0 or less to opt this "
+                "model out of parallel inference and run it in the main server "
+                "process. Positive values use the server-level worker count from "
+                "`settings.json` or `MLSERVER_PARALLEL_WORKERS`."
             )
 
             # NOTE: This is a remnant from the previous architecture for parallel

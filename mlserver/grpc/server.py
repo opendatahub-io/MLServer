@@ -7,9 +7,7 @@ from ..settings import Settings
 from ..tracing import get_tracer_provider
 
 from .servicers import InferenceServicer
-from .model_repository import ModelRepositoryServicer
 from .dataplane_pb2_grpc import add_GRPCInferenceServiceServicer_to_server
-from .model_repository_pb2_grpc import add_ModelRepositoryServiceServicer_to_server
 from .interceptors import LoggingInterceptor, PromServerInterceptor
 from .logging import logger
 
@@ -36,10 +34,6 @@ class GRPCServer:
             self._model_repository_handlers,
             raw_input_buffers=self._settings.grpc_raw_input_buffers,
         )
-        self._model_repository_servicer = ModelRepositoryServicer(
-            self._model_repository_handlers
-        )
-
         self._interceptors = []
 
         if self._settings.access_log:
@@ -83,10 +77,6 @@ class GRPCServer:
         add_GRPCInferenceServiceServicer_to_server(
             self._inference_servicer, self._server
         )
-        add_ModelRepositoryServiceServicer_to_server(
-            self._model_repository_servicer, self._server
-        )
-
         self._server.add_insecure_port(
             f"{self._settings.host}:{self._settings.grpc_port}"
         )

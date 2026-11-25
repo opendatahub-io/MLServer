@@ -39,5 +39,9 @@ _generatePydantic() {
     --disable-future-imports
 }
 
-_generatePB "$TARGET"
+# The repository RPCs are defined in dataplane.proto. The model_repository
+# target generates the REST models only.
+if [[ "$TARGET" != "model_repository" ]]; then
+  _generatePB "$TARGET"
+fi
 _generatePydantic "$TARGET"

@@ -1151,11 +1151,7 @@ class ModelRepositoryParameter(google.protobuf.message.Message):
     """
     Messages for the Repository API
 
-    NOTE: These messages used to exist previously on a different protobuf
-    definition. However, they have now been merged with the main
-    GRPCInferenceService.
-
-    An model repository parameter value.
+    A model repository parameter value.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

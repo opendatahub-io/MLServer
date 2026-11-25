@@ -62,5 +62,3 @@ A singleton `_CodecRegistry` holds all registered codecs, keyed by
   is no priority system beyond registration order.
 - The two-level split (Input vs. Request) can be confusing for new
   contributors.
-- Deprecated `encode()` / `decode()` methods on the codec classes add API
-  surface that must be maintained.

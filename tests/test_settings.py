@@ -555,12 +555,8 @@ def test_grpc_create_server_interceptor_config(
     server = GRPCServer(settings, data_plane, model_repo)
 
     with patch("mlserver.grpc.server.InferenceServicer"), patch(
-        "mlserver.grpc.server.ModelRepositoryServicer"
-    ), patch("mlserver.grpc.server.aio.server", return_value=MagicMock()), patch(
-        "mlserver.grpc.server.add_GRPCInferenceServiceServicer_to_server"
-    ), patch(
-        "mlserver.grpc.server.add_ModelRepositoryServiceServicer_to_server"
-    ):
+        "mlserver.grpc.server.aio.server", return_value=MagicMock()
+    ), patch("mlserver.grpc.server.add_GRPCInferenceServiceServicer_to_server"):
         server._create_server()
 
     logging_interceptors = [

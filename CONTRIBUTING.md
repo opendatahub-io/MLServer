@@ -78,7 +78,7 @@ make test
 poetry run pytest tests/
 
 # Single file
-poetry run pytest tests/batch_processing/test_rest.py
+poetry run pytest tests/batching/test_adaptive.py
 
 # Runtime-specific tests
 cd runtimes/sklearn && poetry run pytest tests/
