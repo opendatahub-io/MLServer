@@ -37,6 +37,8 @@ jobs:
         with:
           version: ${{ env.POETRY_VERSION }}
           virtualenvs-create: false
+          # Parallel downgrades can remove metadata while another pip process scans it.
+          installer-parallel: false
       - name: Install dependencies
         run: poetry sync --only dev
       - name: Generate ${{ matrix.target }}
@@ -63,6 +65,8 @@ jobs:
         with:
           version: ${{ env.POETRY_VERSION }}
           virtualenvs-create: false
+          # Parallel downgrades can remove metadata while another pip process scans it.
+          installer-parallel: false
       - name: Install dependencies
         run: poetry sync --only dev
       - name: Lint
@@ -114,6 +118,8 @@ jobs:
         with:
           version: ${{ env.POETRY_VERSION }}
           virtualenvs-create: false
+          # Parallel downgrades can remove metadata while another pip process scans it.
+          installer-parallel: false
       - name: Install dependencies
         run: poetry install --only test
       - name: Test
@@ -166,6 +172,8 @@ jobs:
         with:
           version: ${{ env.POETRY_VERSION }}
           virtualenvs-create: false
+          # Parallel downgrades can remove metadata while another pip process scans it.
+          installer-parallel: false
       - name: Install dependencies
         run: poetry install --only test
       - name: Test
@@ -236,6 +244,8 @@ jobs:
         with:
           version: ${{ env.POETRY_VERSION }}
           virtualenvs-create: false
+          # Parallel downgrades can remove metadata while another pip process scans it.
+          installer-parallel: false
       - name: Install dependencies
         run: poetry install --only test
       - name: Test
