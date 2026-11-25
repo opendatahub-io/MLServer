@@ -1,10 +1,11 @@
 import asyncio
+from contextlib import contextmanager
 from contextvars import ContextVar
 from time import monotonic
 
 from asyncio import Future, Queue, wait_for, Task
 from functools import partial, wraps
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from typing import Any
 
 from fastapi import status
@@ -24,6 +25,11 @@ from .requests import BatchedRequests
 _AdaptiveBatchingAttr = "__adaptive_batching__"
 _AdaptiveBatcherStreamingTask: ContextVar[Task[Any] | None] = ContextVar(
     "adaptive_batcher_streaming_task", default=None
+)
+# Dispatch (wire) id of the request currently being queued, set by the
+# worker's request processing so remote cancellations can target it.
+_CurrentDispatchId: ContextVar[str | None] = ContextVar(
+    "adaptive_batcher_dispatch_id", default=None
 )
 
 
@@ -48,6 +54,8 @@ class AdaptiveBatcher:
         self._predict_stream_fn = model.predict_stream
         self.__requests: Queue[tuple[str, InferenceRequest]] | None = None
         self._async_responses: dict[str, Future[InferenceResponse]] = {}
+        # Wire dispatch id -> batcher internal id, for remote cancellation.
+        self._external_ids: dict[str, str] = {}
         self._batching_task = None
         metrics.register("batch_request_queue", "counter of request queue batch size")
 
@@ -83,9 +91,32 @@ class AdaptiveBatcher:
         delattr(self._model, _AdaptiveBatchingAttr)
 
     async def predict(self, req: InferenceRequest) -> InferenceResponse:
+        external_id = _CurrentDispatchId.get()
         internal_id, _ = await self._queue_request(req)
         self._start_batcher_if_needed()
-        return await self._wait_response(internal_id)
+        try:
+            return await self._wait_response(internal_id)
+        finally:
+            if external_id is not None:
+                self._external_ids.pop(external_id, None)
+
+    def evict(self, external_id: str) -> bool:
+        """Cancel a still-queued request by its wire dispatch id.
+
+        Called from the worker's control path when the dispatching
+        frontend cancels the request. Cancelling the response future is
+        enough: the collection loop skips requests whose future is done,
+        so an evicted request never enters a batch. A request already
+        merged into an executing batch completes and its (ignored) reply
+        is discarded by the frontend.
+        """
+        internal_id = self._external_ids.pop(external_id, None)
+        if internal_id is None:
+            return False
+        future = self._async_responses.get(internal_id)
+        if future is not None and not future.done():
+            future.cancel()
+        return True
 
     @property
     def _requests(self) -> Queue[tuple[str, InferenceRequest]]:
@@ -101,12 +132,33 @@ class AdaptiveBatcher:
         req: InferenceRequest,
     ) -> tuple[str, Awaitable[InferenceResponse]]:
         internal_id = generate_uuid()
-        self._batch_queue_monitor()
-        await self._requests.put((internal_id, req))
+        external_id = _CurrentDispatchId.get()
+        # An evict racing this map write can miss — fire-and-forget by design.
+        if external_id is not None:
+            self._external_ids[external_id] = internal_id
 
+        # Create the response future before admission can block: a
+        # cancel that arrives while the queue is full must find a
+        # cancellable future, not just an ID mapping that gets removed
+        # without effect while the request still runs once admitted.
         loop = asyncio.get_running_loop()
         async_response = loop.create_future()
         self._async_responses[internal_id] = async_response
+
+        try:
+            # The monitor runs inside the admission try: it touches
+            # metric context that a direct (non-server) caller may not
+            # have set, and its failure must clean up the registrations
+            # above instead of leaking them.
+            self._batch_queue_monitor()
+            await self._requests.put((internal_id, req))
+        except BaseException:
+            # Admission failed or was cancelled: the request will never
+            # run, so the future and the ID mapping must not leak.
+            self._async_responses.pop(internal_id, None)
+            if external_id is not None:
+                self._external_ids.pop(external_id, None)
+            raise
 
         return internal_id, async_response
 
@@ -211,7 +263,15 @@ class AdaptiveBatcher:
                 pass
 
             if to_batch:
-                yield BatchedRequests(to_batch)
+                # Drop requests cancelled while queued (remote eviction):
+                # a done future means nobody is waiting for the result.
+                live = {}
+                for internal_id, queued_request in to_batch.items():
+                    future = self._async_responses.get(internal_id)
+                    if future is not None and not future.done():
+                        live[internal_id] = queued_request
+                if live:
+                    yield BatchedRequests(live)
 
     async def _get_request(self, timeout: float) -> tuple[str, InferenceRequest]:
         if not self._requests.empty():
@@ -238,6 +298,48 @@ def adaptive_batching(f: Callable[[InferenceRequest], Awaitable[InferenceRespons
     return _inner
 
 
+@contextmanager
+def streaming_bypass() -> Iterator[None]:
+    """Hold the adaptive-batching bypass for the current task.
+
+    Marks the current asyncio task as serving a single-shot stream so
+    the batcher-wrapped ``predict`` runs the model directly instead of
+    joining a batch. Used by the single-shot ``/infer_stream``
+    shortcut; the streaming wrapper holds the same mark per event.
+    """
+    token = _AdaptiveBatcherStreamingTask.set(asyncio.current_task())
+    try:
+        yield
+    finally:
+        _AdaptiveBatcherStreamingTask.reset(token)
+
+
+def is_streaming_bypass_active() -> bool:
+    """Whether the current task holds the batcher bypass mark."""
+    return _AdaptiveBatcherStreamingTask.get() is asyncio.current_task()
+
+
+async def _bypass_aiter(
+    stream: AsyncIterator[InferenceResponse],
+) -> AsyncIterator[InferenceResponse]:
+    """Iterate a stream with the batcher bypass held across each
+    ``anext`` — the fallback's ``predict`` dispatch sees the mark.
+
+    Async generators resume in the consumer's context, so the mark
+    must be (re)applied around each advance, not held across yields.
+    """
+    while True:
+        token = _AdaptiveBatcherStreamingTask.set(asyncio.current_task())
+        try:
+            response = await anext(stream)
+        except StopAsyncIteration:
+            return
+        finally:
+            _AdaptiveBatcherStreamingTask.reset(token)
+
+        yield response
+
+
 def not_implemented_warning(
     f: Callable[[AsyncIterator[InferenceRequest]], AsyncIterator[InferenceResponse]],
 ):
@@ -258,15 +360,7 @@ def not_implemented_warning(
     ) -> AsyncIterator[InferenceResponse]:
         stream = aiter(f(payload))
         try:
-            while True:
-                token = _AdaptiveBatcherStreamingTask.set(asyncio.current_task())
-                try:
-                    response = await anext(stream)
-                except StopAsyncIteration:
-                    return
-                finally:
-                    _AdaptiveBatcherStreamingTask.reset(token)
-
+            async for response in _bypass_aiter(stream):
                 yield response
         finally:
             token = _AdaptiveBatcherStreamingTask.set(asyncio.current_task())
@@ -293,8 +387,18 @@ def _get_batcher(f: Callable) -> AdaptiveBatcher:
 
 
 def _get_model(f: Callable) -> MLModel:
-    wrapped_f = get_wrapped_method(f)
-    if not hasattr(wrapped_f, "__self__"):
-        raise InvalidBatchingMethod(wrapped_f.__name__, reason="method is not bound")
-
-    return getattr(wrapped_f, "__self__")
+    # Walk the __wrapped__ chain but keep any binding found on the way:
+    # a bound method of a decorated function (e.g. @decode_args) still
+    # identifies its model, while parallelised custom handlers are
+    # unbound closures wrapping the model's bound methods.
+    current = f
+    name = getattr(current, "__name__", "method")
+    while current is not None:
+        if hasattr(current, "__self__"):
+            return current.__self__
+        wrapped = getattr(current, "__wrapped__", None)
+        if wrapped is None:
+            break
+        current = wrapped
+        name = getattr(current, "__name__", name)
+    raise InvalidBatchingMethod(name, reason="method is not bound")

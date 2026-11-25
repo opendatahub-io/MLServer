@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from time import perf_counter
 import numpy as np
@@ -184,15 +184,21 @@ class DataPlane:
         payload: InferenceRequest,
         name: str,
         version: str | None = None,
+        model: MLModel | None = None,
     ) -> InferenceResponse:
-        async with self._infer_contextmanager(name, version) as model:
-            payload = self._prepare_payload(payload, model)
+        # ``model``: a pre-resolved instance (the /infer_stream
+        # branch decision and its execution must use the SAME model —
+        # a reload can swap the registration between the two).
+        async with self._infer_contextmanager(name, version, model) as resolved:
+            payload = self._prepare_payload(payload, resolved)
 
-            prediction = await model.predict(payload)
+            prediction = await resolved.predict(payload)
 
             # Ensure ID matches
             prediction.id = payload.id
-            self._inference_middleware.response_middleware(prediction, model.settings)
+            self._inference_middleware.response_middleware(
+                prediction, resolved.settings
+            )
             return prediction
 
     async def infer_stream(
@@ -200,22 +206,35 @@ class DataPlane:
         payloads: AsyncIterator[InferenceRequest],
         name: str,
         version: str | None = None,
+        model: MLModel | None = None,
     ) -> AsyncIterator[InferenceResponse]:
-
-        async with self._infer_contextmanager(name, version) as model:
+        # ``model``: see infer() — the pre-resolved instance.
+        async with self._infer_contextmanager(name, version, model) as resolved:
             # we need to get the first payload to get the ID
             async for payload in payloads:
                 break
 
             payloads_decorated = self._prepare_payloads_generator(
-                payload, payloads, model
+                payload, payloads, resolved
             )
-            async for prediction in model.predict_stream(payloads_decorated):
-                prediction.id = payload.id  # Ensure ID matches
-                self._inference_middleware.response_middleware(
-                    prediction, model.settings
-                )
-                yield prediction
+            stream = resolved.predict_stream(payloads_decorated)
+            try:
+                async for prediction in stream:
+                    prediction.id = payload.id  # Ensure ID matches
+                    self._inference_middleware.response_middleware(
+                        prediction, resolved.settings
+                    )
+                    yield prediction
+            finally:
+                # Closing THIS generator (the SSE chain's aclose)
+                # must also close the model's iterator: suspended at
+                # a yield, it holds model-side resources nothing else
+                # unwinds. Iterators without aclose (a plain
+                # async-for source) are left to their own lifecycle.
+                aclose = getattr(stream, "aclose", None)
+                if aclose is not None:
+                    with suppress(Exception):
+                        await aclose()
 
     @staticmethod
     def _has_array_inputs(payload: InferenceRequest) -> bool:
@@ -230,6 +249,10 @@ class DataPlane:
             isinstance(getattr(tensor.data, "root", tensor.data), np.ndarray)
             for tensor in payload.inputs
         )
+
+    async def resolve_model(self, name: str, version: str | None = None) -> MLModel:
+        """The active model for a request-branch decision."""
+        return await self._model_registry.get_model(name, version)
 
     def _prepare_payload(
         self, payload: InferenceRequest, model: MLModel
@@ -312,9 +335,13 @@ class DataPlane:
         self,
         name: str,
         version: str | None = None,
+        model: MLModel | None = None,
     ) -> AsyncIterator[MLModel]:
         with self._infer_metrics(name, version):
-            model = await self._model_registry.get_model(name, version)
+            # A pre-resolved instance skips the registry lookup: the
+            # caller already decided on it (see infer's ``model``).
+            if model is None:
+                model = await self._model_registry.get_model(name, version)
             if not model.ready:
                 raise ModelNotReady(name, version)
 

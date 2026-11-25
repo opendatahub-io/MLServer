@@ -24,8 +24,11 @@ async def test_abandoned_load_never_publishes(
     release = asyncio.Event()
     cleaned = asyncio.Event()
     models = []
-    registry = MultiModelRegistry(model_operation_timeout=0.05)
+    # Generous for the setup load (xdist descheduling can exceed a
+    # tight wall-clock bound); tightened before the deadline assertions.
+    registry = MultiModelRegistry(model_operation_timeout=5)
     old = await registry.load(sum_model_settings) if replacement else None
+    registry._model_operation_timeout = 0.05
 
     def initialise(settings):
         model = SumModel(settings)
@@ -131,8 +134,10 @@ async def test_unload_timeout_retains_cleanup(sum_model_settings, monkeypatch):
     # one retained cleanup instead of running it twice.
     # Method: Pause unload with events, let its waiter time out, start a second waiter
     # and release the original cleanup; count unload calls.
-    registry = MultiModelRegistry(model_operation_timeout=0.05)
+    # Generous for the setup load (xdist descheduling); tightened below.
+    registry = MultiModelRegistry(model_operation_timeout=5)
     model = await registry.load(sum_model_settings)
+    registry._model_operation_timeout = 0.05
     entered, release = asyncio.Event(), asyncio.Event()
     calls = 0
 
@@ -211,8 +216,8 @@ async def test_postcommit_cleanup_failure_keeps_replacement(
     sum_model_settings, monkeypatch
 ):
     # Purpose: Exercise old-instance cleanup failure after replacement publication.
-    # Expect: The replacement remains the selected ready model even though load reports
-    # cleanup failure.
+    # Expect: The replacement remains the selected ready model and the load succeeds
+    # despite the cleanup failure (the failed cleanup stays owned for the next drain).
     # Method: Make the old model's unload raise, reload the same public identity and
     # inspect the committed lookup before restoring cleanup.
     registry = MultiModelRegistry()
@@ -222,8 +227,8 @@ async def test_postcommit_cleanup_failure_keeps_replacement(
         raise RuntimeError("old resources retained")
 
     monkeypatch.setattr(old, "unload", fail)
-    with pytest.raises(RuntimeError, match="old resources retained"):
-        await registry.load(sum_model_settings)
+    replacement = await registry.load(sum_model_settings)
+    assert replacement.ready
     current = await registry.get_model(old.name, old.version)
     assert current is not old
     assert current.ready
@@ -263,7 +268,8 @@ async def test_failure_preserves_unrelated_names_versions_and_default(
     # exact committed instances and readiness.
     # Method: Load those controls, block replacement preparation with events and query
     # each lookup after its deadline.
-    registry = MultiModelRegistry(model_operation_timeout=0.05)
+    # Generous for the setup loads (xdist descheduling); tightened below.
+    registry = MultiModelRegistry(model_operation_timeout=5)
     versions = []
     for version in ["1", "2", None]:
         settings = sum_model_settings.model_copy(deep=True)
@@ -272,6 +278,7 @@ async def test_failure_preserves_unrelated_names_versions_and_default(
     other = sum_model_settings.model_copy(deep=True)
     other.name = "other-name"
     other_model = await registry.load(other)
+    registry._model_operation_timeout = 0.05
     failed = SumModel(versions[0].settings.model_copy(deep=True))
     entered, release = asyncio.Event(), asyncio.Event()
 
@@ -368,10 +375,16 @@ async def test_version_unload_waits_for_abandoned_preparation(
     # unload then succeeds.
     # Method: Hold version 1 past its deadline, time out unload of version 2, release
     # preparation and repeat unload with a generous bound.
-    registry = MultiModelRegistry(model_operation_timeout=0.05)
+    # The tight operation timeout is only needed for the timeout-driven assertions
+    # below. The setup load's own work is ~3ms, but under the full-suite xdist run
+    # the worker can be descheduled past a 50ms wall-clock bound (16 workers plus
+    # pool-spawning tests oversubscribe the cores) — so keep the setup generous and
+    # tighten before the assertions.
+    registry = MultiModelRegistry(model_operation_timeout=5)
     healthy_settings = sum_model_settings.model_copy(deep=True)
     healthy_settings.parameters.version = "2"
     healthy = await registry.load(healthy_settings)
+    registry._model_operation_timeout = 0.05
     entered, release = asyncio.Event(), asyncio.Event()
     failed_settings = sum_model_settings.model_copy(deep=True)
     failed_settings.parameters.version = "1"
@@ -554,9 +567,15 @@ async def test_redirected_commit_owns_both_displaced_instances(
     attempt = asyncio.create_task(registry.load(settings))
     try:
         await asyncio.wait_for(entered.wait(), 5)
-        expected = ValueError if outcome == "error" else asyncio.TimeoutError
-        with pytest.raises(expected):
-            await asyncio.wait_for(asyncio.shield(attempt), 5)
+        if outcome == "error":
+            # A post-commit cleanup failure no longer fails the load:
+            # the redirected replacement is already committed and
+            # serving; the failed cleanup stays owned for the drain.
+            replacement = await asyncio.wait_for(asyncio.shield(attempt), 5)
+            assert replacement.ready
+        else:
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(asyncio.shield(attempt), 5)
         current = await registry.get_model(settings.name, "2")
         assert current is not loaded["2"]
         assert current.ready

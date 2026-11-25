@@ -33,7 +33,11 @@ INPUT_SHAPE = [1, 3]
 INPUT_VALUES = [1.0, 2.0, 3.0]  # sum = 6.0
 
 
-def _json_payload(outputs: list | None = None, parameters: dict | None = None):
+def _json_payload(
+    outputs: list | None = None,
+    parameters: dict | None = None,
+    request_id: str | None = None,
+):
     request: dict = {
         "inputs": [
             {
@@ -44,6 +48,8 @@ def _json_payload(outputs: list | None = None, parameters: dict | None = None):
             }
         ]
     }
+    if request_id is not None:
+        request["id"] = request_id
     if outputs is not None:
         request["outputs"] = outputs
     if parameters is not None:
@@ -507,7 +513,6 @@ class TestRouteComposition:
 
         async with AsyncClient(app=app, base_url="http://test") as client:
             response = await _post_json(client, _json_payload())
-
         assert response.status_code == 200
         assert spy.call_count == 1
 
@@ -526,6 +531,157 @@ class TestRouteComposition:
         assert response.status_code == 200
         # The binary frame bypasses the worker JSON path entirely.
         assert spy.call_count == 0
+
+
+class TestWorkerJsonBinaryNegotiation:
+    """Delegated JSON requests keep their binary-output negotiation.
+
+    Every JSON request takes the rest_worker_json path when enabled;
+    the negotiation is resolved from the PARSED request — at the
+    worker dispatch for parallel models, on the local fallback for
+    nonparallel or batched ones (this app's model is nonparallel, so
+    these tests exercise the fallback). The pre-parse marker scan this
+    replaces routed any body containing the marker bytes to a full
+    local parse (~90 ms of frontend CPU on a 15 MB body) and cost
+    ~5.5 ms whenever any underscore appeared (IDs, content_type keys).
+    """
+
+    async def test_negotiating_json_delegates_and_returns_binary(
+        self, binary_app, mocker
+    ):
+        from mlserver.rest.worker import RawEndpoints
+
+        spy = mocker.spy(RawEndpoints, "infer")
+        app = binary_app(worker_json=True)
+
+        payload = _json_payload(parameters={"binary_data_output": True})
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await _post_json(client, payload)
+
+        assert response.status_code == 200
+        assert spy.call_count == 1, "a negotiating request must still delegate"
+        assert response.headers["content-type"] == "application/octet-stream"
+        header, payload_bytes = _parse_framed(response)
+        assert header["outputs"][0]["parameters"]["binary_data_size"] == 4
+        assert np.frombuffer(payload_bytes, dtype="<f4") == 6.0
+
+    async def test_per_output_negotiation_delegates_and_returns_binary(
+        self, binary_app, mocker
+    ):
+        from mlserver.rest.worker import RawEndpoints
+
+        spy = mocker.spy(RawEndpoints, "infer")
+        app = binary_app(worker_json=True)
+
+        payload = _json_payload(
+            outputs=[{"name": "total", "parameters": {"binary_data": True}}]
+        )
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await _post_json(client, payload)
+
+        assert response.status_code == 200
+        assert spy.call_count == 1
+        assert response.headers["content-type"] == "application/octet-stream"
+        header, payload_bytes = _parse_framed(response)
+        assert header["outputs"][0]["parameters"]["binary_data_size"] == 4
+
+    async def test_delegated_negotiation_matches_local_path(self, binary_app):
+        """Wire identity: the delegated reply is byte-identical to the
+        local path's reply for the same negotiating request (a fixed
+        id: an auto-generated one would differ between the two)."""
+        payload = _json_payload(
+            parameters={"binary_data_output": True}, request_id="parity-id"
+        )
+
+        async with AsyncClient(
+            app=binary_app(worker_json=True), base_url="http://test"
+        ) as client:
+            delegated = await _post_json(client, payload)
+        async with AsyncClient(
+            app=binary_app(worker_json=False), base_url="http://test"
+        ) as client:
+            local = await _post_json(client, payload)
+
+        assert delegated.status_code == local.status_code == 200
+        assert delegated.content == local.content
+        assert delegated.headers["content-type"] == local.headers["content-type"]
+        assert (
+            delegated.headers["inference-header-content-length"]
+            == local.headers["inference-header-content-length"]
+        )
+
+    async def test_underscore_id_delegates_without_marker_scan(
+        self, binary_app, mocker
+    ):
+        """The P2 reproducer: an underscore in the request ID must not
+        route the request away from the worker JSON path (the old
+        pre-parse guard byte was b"_" — any underscore forced a full
+        multi-byte marker search over the body)."""
+        from mlserver.rest.worker import RawEndpoints
+
+        spy = mocker.spy(RawEndpoints, "infer")
+        app = binary_app(worker_json=True)
+
+        payload = _json_payload(request_id="sample_0")
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await _post_json(client, payload)
+
+        assert response.status_code == 200
+        assert spy.call_count == 1, "an underscore ID must still delegate"
+        assert response.headers["content-type"].startswith("application/json")
+
+    async def test_marker_false_positive_delegates(self, binary_app, mocker):
+        """A body whose bytes contain the negotiation key spelling
+        WITHOUT an actual negotiation (an input-level parameter) must
+        delegate and get plain JSON — the old marker check paid a full
+        local parse for this class of bodies."""
+        from mlserver.rest.worker import RawEndpoints
+
+        spy = mocker.spy(RawEndpoints, "infer")
+        app = binary_app(worker_json=True)
+
+        payload = orjson.dumps(
+            {
+                "inputs": [
+                    {
+                        "name": "input-0",
+                        "datatype": "FP32",
+                        "shape": INPUT_SHAPE,
+                        "data": INPUT_VALUES,
+                        "parameters": {"binary_data_output": False},
+                    }
+                ]
+            }
+        )
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await _post_json(client, payload)
+
+        assert response.status_code == 200
+        assert spy.call_count == 1
+        assert response.headers["content-type"].startswith("application/json")
+
+    async def test_escaped_negotiation_key_delegates(self, binary_app, mocker):
+        """An escaped key spelling (\\u0062inary_data_output) is decoded
+        by the standard parse and the negotiation resolved exactly —
+        the case the old unicode-escape marker routed local."""
+        from mlserver.rest.worker import RawEndpoints
+
+        spy = mocker.spy(RawEndpoints, "infer")
+        app = binary_app(worker_json=True)
+
+        payload = (
+            b'{"parameters":{"\\u0062inary_data_output":true},'
+            b'"inputs":[{"name":"input-0","datatype":"FP32",'
+            b'"shape":[1,3],"data":[1.0,2.0,3.0]}]}'
+        )
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            response = await _post_json(client, payload)
+
+        assert response.status_code == 200
+        assert spy.call_count == 1
+        assert response.headers["content-type"] == "application/octet-stream"
+        header, payload_bytes = _parse_framed(response)
+        assert header["outputs"][0]["parameters"]["binary_data_size"] == 4
 
 
 class TestBatchingCompatibility:
@@ -585,3 +741,180 @@ class TestBatchingCompatibility:
 
         restored = getattr(payload.inputs[0].data, "root", payload.inputs[0].data)
         assert isinstance(restored, np.ndarray)
+
+
+def test_binary_output_dtype_mismatch_converts_to_declaration():
+    """A response array whose dtype differs from the declared datatype
+    converts to the declaration when the conversion is lossless
+    (widening or same-width) — the same value coercion the plain-JSON
+    path applies, so both transports represent the same values.
+    Narrowing conversions are refused instead (see
+    test_binary_output_narrowing_falls_back_to_inline_json). The gRPC
+    raw path keeps struct's checked semantics (its historical
+    behavior); this path keeps numpy's historical one."""
+    import numpy as np
+
+    from mlserver.rest.binary import _encode_output_bytes
+
+    # int32 array declared INT64: converts, values preserved.
+    output = Mock()
+    output.datatype = "INT64"
+    output.data = np.array([1, 2], dtype=np.int32)
+    packed = _encode_output_bytes(output)
+    assert packed == np.array([1, 2], dtype=np.int64).tobytes()
+
+    # Same-width kind conversion packs (values convert exactly).
+    output2 = Mock()
+    output2.datatype = "FP64"
+    output2.data = np.array([1, 2], dtype=np.int64)
+    packed2 = _encode_output_bytes(output2)
+    assert packed2 == np.array([1, 2], dtype=np.float64).tobytes()
+
+
+def test_binary_output_narrowing_falls_back_to_inline_json():
+    """A narrowing conversion (array dtype wider than the declared
+    datatype) cannot be lossless — astype would silently truncate or
+    wrap values the plain-JSON path preserves exactly. The packer must
+    refuse binary packing so the output falls back to inline JSON."""
+    import numpy as np
+
+    from mlserver.rest.binary import _encode_output_bytes
+
+    # INT64 data under an INT32 declaration: refuse (None -> fallback).
+    output = Mock()
+    output.datatype = "INT32"
+    output.data = np.array([5, 6], dtype=np.int64)
+    assert _encode_output_bytes(output) is None
+
+    # Same refusal for values that would happen to fit: the byte-width
+    # mismatch alone must trigger the fallback (binary_data_size would
+    # frame the wrong width for the declared datatype regardless of
+    # the values' magnitude).
+    output2 = Mock()
+    output2.datatype = "INT32"
+    output2.data = np.array([2**40], dtype=np.int64)  # would wrap
+    assert _encode_output_bytes(output2) is None
+
+
+def test_binary_output_big_endian_normalises_to_little_endian():
+    """A big-endian response array packs as little-endian bytes (the
+    wire format's requirement), matching the little-endian array's
+    output exactly."""
+    import numpy as np
+
+    from mlserver.rest.binary import _encode_output_bytes
+
+    big_endian = np.array([1.5, -2.5], dtype=">f4")
+    little_endian = np.array([1.5, -2.5], dtype="<f4")
+
+    output_be = Mock()
+    output_be.datatype = "FP32"
+    output_be.data = big_endian
+    output_le = Mock()
+    output_le.datatype = "FP32"
+    output_le.data = little_endian
+
+    assert _encode_output_bytes(output_be) == _encode_output_bytes(output_le)
+    assert _encode_output_bytes(output_be) == little_endian.tobytes()
+
+
+def test_binary_fallback_renders_compact_floats_like_json_path(monkeypatch):
+    """Fallback inline JSON honours the compact-floats opt-in."""
+    # The fallback's contract: render byte-identically to the plain-JSON
+    # path (one canonical rendering per value per configuration).
+    import numpy as np
+    import orjson
+
+    from mlserver.codecs import json as json_codec
+    from mlserver.rest.binary import encode_binary_response
+
+    monkeypatch.setattr(json_codec, "_json_compact_floats", True)
+
+    arr = np.array([0.1, 1.5, -2.25], dtype=np.float32)
+    output = Mock()
+    output.name = "out"
+    output.datatype = "FP16"  # narrower than the FP32 data -> fallback
+    output.shape = [3]
+    output.parameters = None
+    output.data = arr
+
+    response = Mock()
+    response.model_name = "m"
+    response.model_version = None
+    response.id = "x"
+    response.parameters = None
+    response.outputs = [output]
+
+    body, header_len = encode_binary_response(response, default_binary=True)
+
+    header = orjson.loads(body[:header_len])
+    out = header["outputs"][0]
+    # fell back to inline JSON (no binary framing)
+    assert "binary_data_size" not in (out.get("parameters") or {})
+    # the compact form: shortest round-trip FP32 text, exactly what the
+    # plain-JSON path emits for the same array
+    assert out["data"] == [0.1, 1.5, -2.25]
+    # NOT the widened default form
+    assert b"0.10000000149011612" not in body
+
+
+def test_binary_fallback_default_stays_widened(monkeypatch):
+    """Fallback inline JSON stays widened with compact floats off."""
+    # Default (flag off): tolist's widened Python floats, byte-identical
+    # to the plain-JSON path's default float64 bridge.
+    import numpy as np
+    import orjson
+
+    from mlserver.codecs import json as json_codec
+    from mlserver.rest.binary import encode_binary_response
+
+    monkeypatch.setattr(json_codec, "_json_compact_floats", False)
+
+    arr = np.array([0.1, 1.5, -2.25], dtype=np.float32)
+    output = Mock()
+    output.name = "out"
+    output.datatype = "FP16"
+    output.shape = [3]
+    output.parameters = None
+    output.data = arr
+
+    response = Mock()
+    response.model_name = "m"
+    response.model_version = None
+    response.id = "x"
+    response.parameters = None
+    response.outputs = [output]
+
+    body, header_len = encode_binary_response(response, default_binary=True)
+
+    header = orjson.loads(body[:header_len])
+    out = header["outputs"][0]
+    assert "binary_data_size" not in (out.get("parameters") or {})
+    assert out["data"] == [0.10000000149011612, 1.5, -2.25]
+
+
+def test_binary_output_same_width_cross_kind_keeps_astype_semantics():
+    """Same-width cross-kind conversions pack per numpy's astype."""
+    # Documented divergence from the plain-JSON path (which renders the
+    # actual values): the REST binary path historically keeps numpy's
+    # coercion — a float under an integer declaration truncates, an int
+    # under a float declaration rounds. Pinned so the divergence is
+    # explicit and intentional, not accidental drift.
+    import numpy as np
+
+    from mlserver.rest.binary import _encode_output_bytes
+
+    # float 1.5 under an INT32 declaration (same width): packs as 1
+    output = Mock()
+    output.datatype = "INT32"
+    output.data = np.array([1.5, -2.5], dtype=np.float32)
+    assert _encode_output_bytes(output) == np.array([1, -2], dtype=np.int32).tobytes()
+
+    # int under FP32 (same width): converts exactly for small values
+    output2 = Mock()
+    output2.datatype = "FP32"
+    output2.data = np.array([1, 2], dtype=np.int32)
+    assert (
+        _encode_output_bytes(output2)
+        == np.array([1.0, 2.0], dtype=np.float32).tobytes()
+    )

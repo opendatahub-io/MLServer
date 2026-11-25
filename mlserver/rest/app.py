@@ -13,6 +13,8 @@ from .requests import Request
 from .responses import Response
 from .errors import _EXCEPTION_HANDLERS
 
+import os
+
 from ..settings import Settings
 from ..handlers import DataPlane, ModelRepositoryHandlers
 from ..types import InferenceResponse
@@ -143,16 +145,20 @@ def create_app(
             response_model=InferenceResponse,
             openapi_extra=inference_openapi,
         ),
-        # Model generate
+        # Model generate (same handler as /infer; response_model kept
+        # explicit — the handler's -> Response return annotation no
+        # longer carries the schema)
         APIRoute(
             "/v2/models/{model_name}/generate",
             endpoints.infer,
             methods=["POST"],
+            response_model=InferenceResponse,
         ),
         APIRoute(
             "/v2/models/{model_name}/versions/{model_version}/generate",
             endpoints.infer,
             methods=["POST"],
+            response_model=InferenceResponse,
         ),
         # Model infer_stream
         APIRoute(
@@ -270,6 +276,17 @@ def create_app(
         )
 
     app.router.route_class = APIRoute
+
+    frontend_id = os.environ.get("MLSERVER_FRONTEND_ID")
+    if frontend_id is not None:
+
+        @app.middleware("http")
+        async def _add_frontend_id_header(request, call_next):
+            # Makes SO_REUSEPORT distribution observable from clients;
+            # only set in multi-frontend mode.
+            response = await call_next(request)
+            response.headers["x-mlserver-frontend-id"] = frontend_id
+            return response
 
     if settings.gzip_enabled:
         # GZip middleware does not work with streaming

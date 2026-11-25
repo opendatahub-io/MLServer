@@ -23,7 +23,7 @@ LOGICAL_BYTES_ELEMENTS = "_mlserver_logical_bytes_elements"
 LOGICAL_BYTES_SENTINEL = ("mlserver-internal", "logical-bytes-elements")
 
 
-def _set_logical_elements(request_input: InputOrOutput) -> None:
+def set_logical_elements(request_input: InputOrOutput) -> None:
     """Mark an input as carrying logical (opaque) byte elements.
 
     Used by test fixtures and any internal caller that needs to flag
@@ -136,10 +136,75 @@ def _to_ndarray(input_or_output: InputOrOutput) -> np.ndarray:
             decoded = [np.frombuffer(buffer, dtype) for buffer in data]
             return np.concatenate(decoded)
 
+    # Zero-copy fast path: an ndarray of the target dtype (from the
+    # binary REST path or the native JSON span parser) is reshaped
+    # into a view — no element walk, no copy. Safety: the request
+    # is consumed once by the model (the response pipeline copies
+    # independently, see _encode_data); the batcher's
+    # restore_list_inputs() converts ndarrays back to lists before
+    # list-based merging; and cross-process dispatch (ZMQ pickle)
+    # copies anyway, so the view is only exposed in the direct
+    # single-process topology where the request is short-lived.
+    # Boundary: repeated decode() calls within one request return
+    # views of the same buffer when the backing is WRITABLE (the
+    # span parser's fresh buffers), so an in-place mutation is
+    # visible to later decodes. Read-only backings (np.frombuffer
+    # over request bytes) copy per decode, like list roots —
+    # mutations never reach the immutable request bytes.
+    # Models that decode, mutate and re-decode the same input are
+    # outside the consumed-once contract.
+    if isinstance(data, np.ndarray) and data.dtype == dtype:
+        result = data.reshape(input_or_output.shape)
+        if not result.flags.writeable:
+            # A read-only backing (np.frombuffer over immutable
+            # request bytes — the binary REST and gRPC raw paths)
+            # cannot support in-place preprocessing; copy to match
+            # the writable array the list path always produced.
+            result = result.copy()
+        return result
+
+    if isinstance(data, list):
+        # Fast path: a flat list whose length matches the declared shape
+        # converts element-wise through fromiter. Anything fromiter cannot
+        # consume (nested lists, strings, overflow, unsupported dtypes)
+        # falls back to the generic np.array path, so behaviour stays
+        # bit-identical for every input the generic path accepts.
+        expected = 1
+        for dim in input_or_output.shape:
+            expected *= dim
+        try:
+            if expected == len(data):
+                # Reject nested data: np.fromiter would silently convert
+                # a non-empty inner list to True (bool([False]) is True),
+                # changing the wire format for BOOL tensors. Other
+                # dtypes self-error on nested items, so only the first
+                # element needs the fast check; BOOL must scan every
+                # element because fromiter accepts a nested item hiding
+                # behind leading scalars ([1, [2]] -> [True, True]).
+                if data and isinstance(data[0], (list, tuple)):
+                    raise TypeError("nested data not supported by fromiter")
+                if dtype == np.bool_ and any(
+                    isinstance(value, (list, tuple)) for value in data
+                ):
+                    raise TypeError("nested data not supported by fromiter")
+                return np.fromiter(data, dtype, count=expected)
+        except (TypeError, ValueError, OverflowError):
+            pass
+
     return np.array(data, dtype)
 
 
-def _encode_data(data: np.ndarray, datatype: Datatype) -> list:
+# The ndarray-native response pipeline runs at EVERY topology: the
+# mode-aware TensorData serializer (python mode keeps the array,
+# float32 widened to float64) plus orjson's OPT_SERIALIZE_NUMPY render
+# eliminates the Python element list entirely, so there is no
+# materialisation work left to relocate — the reason the old topology
+# gate existed is gone.
+# Byte-identity with the list path is verified by the wire fixtures.
+
+
+def _encode_data(data: np.ndarray, datatype: Datatype) -> Any:
+    # Non-BYTES tensors keep their NumPy representation (flat view) to the wire.
     if datatype == Datatype.BYTES:
         if np.issubdtype(data.dtype, str):
             # Handle special case of a string Numpy array, where the diff elems
@@ -154,17 +219,41 @@ def _encode_data(data: np.ndarray, datatype: Datatype) -> list:
             # need to encapsulate it into a list so that it's compatible.
             return [data.tobytes()]
 
-    flattened_list = data.flatten().tolist()
+        # Opaque byte elements (e.g. object arrays): exact values and
+        # lengths as an element list.
+        return data.flatten().tolist()
 
-    # Replace NaN with null
-    if datatype != Datatype.BYTES:
-        # The `isnan` method doesn't work on Numpy arrays with non-numeric
-        # types
-        has_nan = np.isnan(data).any()
-        if has_nan:
-            flattened_list = list(map(convert_nan, flattened_list))
+    if isinstance(data, np.ma.MaskedArray):
+        # Masked arrays keep the legacy list representation: tolist
+        # converts masked entries to None, matching the pre-ndarray
+        # wire format. An ndarray root would carry the MaskedArray
+        # subclass through to the wire encoders, whose tobytes()
+        # substitutes the array's fill_value instead of a missing
+        # value marker.
+        return data.flatten().tolist()
 
-    return flattened_list
+    flat = data.ravel()
+    if flat is data or flat.base is not None:
+        # ravel returned a view sharing the caller's buffer; copy to
+        # detach so post-encode mutation of the model's output (e.g. a
+        # model reusing its buffer for the next request) cannot change
+        # a response that is still in flight. This fires for every
+        # contiguous output (ravel returns a view of itself) — one
+        # memcpy per output tensor, the accepted cost of buffer safety.
+        flat = flat.copy()
+    if np.issubdtype(flat.dtype, np.floating):
+        nan_mask = np.isnan(flat)
+        if nan_mask.any():
+            # Canonicalise noncanonical NaN bit patterns (e.g. 0x7FC00001)
+            # to the canonical quiet NaN: mask-assignment with the np.nan
+            # scalar stores that constant's bits (a scalar broadcast, not
+            # an FPU arithmetic op), so every NaN payload collapses to one
+            # bit pattern and bit-exact parity checks hold. In-place is
+            # safe: flat is private here (explicit copy above, or ravel's
+            # own copy for non-contiguous inputs). Verified by
+            # TestBufferMutation.test_nan_payload_does_not_mutate_source.
+            flat[nan_mask] = np.nan
+    return flat
 
 
 def convert_nan(val):

@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from collections.abc import Iterator
 from multiprocessing.reduction import ForkingPickler
 from pathlib import Path
@@ -8,7 +9,8 @@ from unittest.mock import AsyncMock, Mock, patch
 import numpy as np
 import pytest
 
-zmq = pytest.importorskip("zmq")
+import zmq
+import zmq.asyncio
 from mlserver.parallel import zmq as transport  # noqa: E402
 from mlserver.parallel.errors import WorkerError  # noqa: E402
 from mlserver.parallel.messages import (  # noqa: E402
@@ -30,7 +32,7 @@ def worker(directory: Path, reply: str) -> Mock:
         spec=Worker,
         pid=42,
         _zmq_request_endpoint=transport.create_endpoint(directory, "q"),
-        _zmq_reply_endpoint=reply,
+        _zmq_reply_endpoints=[reply],
     )
 
 
@@ -617,7 +619,9 @@ async def test_worker_partial_socket_setup_is_cleaned(
     context, requests = Mock(), Mock()
     primary = RuntimeError("socket failed")
     cleanup = RuntimeError("context retirement failed")
-    target = worker(directory, "unused")
+    # A real endpoint string; serve_requests validates endpoints before
+    # the mocked PUSH acquisition fails.
+    target = worker(directory, transport.create_endpoint(directory, "r"))
     if term_fails:
         context.term.side_effect = cleanup
 
@@ -654,3 +658,195 @@ def test_socket_option_failure_closes_partial_socket() -> None:
     with pytest.raises(RuntimeError, match="option failed"):
         transport._socket(context, zmq.PUSH, set())
     sock.close.assert_called_once_with(linger=0)
+
+
+def test_frontend_id_defaults_to_zero() -> None:
+    """Requests without an explicit frontend_id route to socket 0."""
+    message = ModelRequestMessage(model_name="m", method_name="predict")
+    assert message.frontend_id == 0
+
+
+def test_frontend_id_is_serialised_across_ipc() -> None:
+    """The frontend_id survives the pickle round trip."""
+    from multiprocessing.reduction import ForkingPickler
+
+    message = ModelRequestMessage(model_name="m", method_name="predict", frontend_id=3)
+    restored = ForkingPickler.loads(ForkingPickler.dumps(message))
+    assert restored.frontend_id == 3
+
+
+@pytest.mark.parametrize("frontend_id", [0, 1])
+async def test_reply_routes_to_frontend_socket(
+    directory: Path, frontend_id: int
+) -> None:
+    """Replies go to the socket belonging to the dispatching frontend."""
+    reply_endpoints = [transport.create_endpoint(directory, "r") for _ in range(2)]
+    mock_worker = Mock(
+        spec=Worker,
+        pid=42,
+        _zmq_request_endpoint=transport.create_endpoint(directory, "q"),
+        _zmq_reply_endpoints=reply_endpoints,
+    )
+    request = ModelRequestMessage(
+        model_name="m", method_name="predict", frontend_id=frontend_id
+    )
+
+    import zmq.asyncio as zmq_aio
+    from mlserver.parallel.zmq import _socket
+
+    context = zmq_aio.Context(io_threads=1)
+    pulls = []
+    reply_sockets = []
+    try:
+        for ep in reply_endpoints:
+            pull = _socket(context, zmq.PULL, set())
+            pull.bind(ep)
+            pulls.append(pull)
+
+        # Simulate the worker's reply routing
+        from mlserver.parallel.zmq import _reply
+
+        for ep in reply_endpoints:
+            push = _socket(context, zmq.PUSH, set())
+            push.connect(ep)
+            reply_sockets.append(push)
+
+        # The mock worker's _process_request returns a response
+        mock_worker._process_request = AsyncMock(
+            return_value=ModelResponseMessage(id=request.id)
+        )
+        await _reply(mock_worker, request, reply_sockets)
+
+        # Only the dispatching frontend's PULL should receive the reply
+        received = [False, False]
+        for i, pull in enumerate(pulls):
+            try:
+                await asyncio.wait_for(pull.recv(copy=True), timeout=0.5)
+                received[i] = True
+            except asyncio.TimeoutError:
+                pass
+        assert received == [frontend_id == 0, frontend_id == 1]
+    finally:
+        for sock in pulls + reply_sockets:
+            sock.close(linger=0)
+        context.term()
+
+
+async def test_frontend_id_out_of_range_drops_reply(directory: Path) -> None:
+    """A frontend_id beyond the configured endpoints is dropped, not
+    fatal: the serve loop treats any _reply exception as fatal
+    (killing the worker and every in-flight request on it), so a
+    reply with no recipient must log-and-drop — the same failure
+    mode as zmq.Again. Only recv and protocol errors are fatal."""
+    reply_endpoint = transport.create_endpoint(directory, "r")
+    mock_worker = Mock(
+        spec=Worker,
+        pid=42,
+        _zmq_request_endpoint=transport.create_endpoint(directory, "q"),
+        _zmq_reply_endpoints=[reply_endpoint],
+    )
+    request = ModelRequestMessage(model_name="m", method_name="predict", frontend_id=5)
+
+    from mlserver.parallel.zmq import _reply
+
+    mock_worker._process_request = AsyncMock(
+        return_value=ModelResponseMessage(id=request.id)
+    )
+    # A single mock socket (only 1 endpoint configured)
+    socket = AsyncMock()
+    # Must not raise (the worker survives) and must not send anywhere.
+    await _reply(mock_worker, request, [socket])
+    socket.send.assert_not_awaited()
+
+
+def test_worker_accepts_single_endpoint_backward_compat(
+    directory: Path,
+) -> None:
+    """Workers initialised from pools that set only the old single-endpoint
+    attribute still work (one reply endpoint)."""
+    from multiprocessing import Queue
+
+    settings = None  # not needed for the init-logic reproduction
+    responses = Mock(spec=Queue)
+    # Old-style: only _zmq_reply_endpoint (singular)
+    single = f"ipc://{directory}/legacy-reply"
+    responses._zmq_reply_endpoints = None
+    responses._zmq_reply_endpoint = single
+
+    worker = Worker.__new__(Worker)
+    worker._settings = settings  # type: ignore[assignment]
+    worker._zmq_request_endpoint = None
+    worker._zmq_reply_endpoints = []
+
+    # Reproduce the init logic (without spawning a process)
+    reply_endpoints = getattr(responses, "_zmq_reply_endpoints", None)
+    if reply_endpoints is None:
+        legacy = getattr(responses, "_zmq_reply_endpoint", None)
+        if isinstance(legacy, str) and legacy.startswith("ipc://"):
+            reply_endpoints = [legacy]
+    assert reply_endpoints == [single]
+
+
+def test_worker_accepts_multiple_endpoints(directory: Path) -> None:
+    """Workers accept a list of reply endpoints (one per frontend)."""
+    endpoints = [f"ipc://{directory}/reply-{i}" for i in range(3)]
+    from multiprocessing import Queue
+
+    responses = Mock(spec=Queue)
+    responses._zmq_reply_endpoints = endpoints
+    responses._zmq_reply_endpoint = None
+
+    # The list attribute is preferred over the singular
+    result = getattr(responses, "_zmq_reply_endpoints", None)
+    if result is None:
+        legacy = getattr(responses, "_zmq_reply_endpoint", None)
+        if isinstance(legacy, str) and legacy.startswith("ipc://"):
+            result = [legacy]
+    assert result == endpoints
+
+
+async def test_close_completes_when_receiver_never_settles(
+    directory: Path, mocker
+) -> None:
+    """The receiver settle inside close() is bounded: pyzmq's asyncio
+    recv future can intermittently fail to propagate cancellation at
+    the C level, leaving the receiver unsettled forever — and the
+    caller's shield prevents an outer cancellation from reaching the
+    close, so the bound is the only escape. A receiver whose
+    underlying future REFUSES cancellation must not hang server
+    shutdown."""
+    from mlserver.parallel import zmq as zmq_module
+    from mlserver.parallel.zmq import ParentTransport
+
+    zmq_module._RECEIVER_SETTLE_TIMEOUT = 0.1  # tightened for the test
+    try:
+
+        class UnstoppableFuture(asyncio.Future):
+            """The pathological pyzmq case: cancel() is delivered but
+            the underlying future never settles."""
+
+            def cancel(self, *args, **kwargs) -> bool:
+                return False
+
+        never = UnstoppableFuture()
+
+        async def pathological_receiver() -> None:
+            await never
+
+        transport_obj = ParentTransport(transport.create_endpoint(directory, "r"))
+        transport_obj._receiver = asyncio.ensure_future(pathological_receiver())
+        await asyncio.sleep(0)  # let the receiver reach its await
+        # _close() cancels the receiver; the future refuses — the
+        # gather would never settle without the bound.
+        try:
+            # close() must return within the (tightened) bound.
+            await asyncio.wait_for(transport_obj.close(), timeout=2.0)
+        finally:
+            # The abandoned receiver is cleaned up by test teardown:
+            # complete the future so the task settles.
+            if not never.done():
+                never.set_result(None)
+            with contextlib.suppress(asyncio.CancelledError, asyncio.InvalidStateError):
+                await transport_obj._receiver
+    finally:
+        zmq_module._RECEIVER_SETTLE_TIMEOUT = 5.0

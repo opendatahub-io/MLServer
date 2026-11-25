@@ -44,6 +44,130 @@ class RepositoryIndexResponse(RootModel[list[RepositoryIndexResponseItem]]):
     def __len__(self):
         return len(self.root)
 
+    def __eq__(self, other: object) -> bool:
+        # RootModel values must compare against bare lists and other
+        # RootModel roots the way downstream assertions expect. An
+        # ndarray root on either side compares element-wise: pydantic's
+        # field comparison would raise on the ambiguous array truth
+        # value (list roots keep standard equality).
+        from typing import Any, cast
+
+        from numpy import array_equal, ndarray
+
+        if isinstance(other, RootModel):
+            other = other.root
+        if isinstance(self.root, ndarray) or isinstance(other, ndarray):
+            return bool(array_equal(cast(Any, self.root), cast(Any, other)))
+        return bool(self.root == other)
+
+    from pydantic import field_validator  # type: ignore[misc]
+
+    @field_validator("root", mode="wrap")
+    @classmethod
+    def _keep_ndarray_root(cls, value, handler):
+        # An ndarray root skips the union validation: the list branch
+        # walks every element into a temporary scalar list before the
+        # Any branch keeps the original array — O(N) work for an
+        # identity result. The array's metadata (datatype, element
+        # count) is validated where it is produced (the span parser,
+        # the codecs), not here; every other root type takes the
+        # original validation unchanged through the handler.
+        from numpy import ndarray
+
+        if isinstance(value, ndarray):
+            return value
+        return handler(value)
+
+    from pydantic import model_serializer  # type: ignore[misc]
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler, info):
+        # Ndarray roots take one of two paths:
+        #
+        # JSON mode (model_dump_json / model_dump(mode="json")) keeps
+        # today's exact behaviour: flat element list, NaN -> None.
+        #
+        # Python mode (model_dump) KEEPS the array so orjson's
+        # OPT_SERIALIZE_NUMPY renders it straight from the buffer —
+        # ~3.5x faster than tolist + orjson on a 28K-float
+        # response with byte-identical output. float32 widens to
+        # float64 first: orjson would
+        # otherwise emit the shortest float32 repr, a wire-format
+        # change. Dtypes orjson cannot render natively (complex,
+        # float16, object, datetime) keep the list path.
+        from numpy import isnan, ma, ndarray
+
+        data = self.root
+        if isinstance(data, ndarray):
+            flat = data.reshape(-1)
+            # Masked arrays keep the list path in BOTH modes: masked
+            # entries are None on the wire (tolist), and the native
+            # buffer path would render fill values. Falls through to
+            # the shared list logic (NaN -> None included).
+            if not info.mode_is_json() and not isinstance(data, ma.MaskedArray):
+                # orjson's native numpy rendering accepts only the
+                # BASE ndarray class: a subclass root (custom array
+                # types from model code, which the tolist boundary
+                # served as plain lists) would fall through to the
+                # bytes-only default handler and fail the response.
+                # Strip the subclass with a zero-copy base-class
+                # view; plain arrays pay one pointer comparison.
+                if type(flat) is not ndarray:
+                    flat = flat.view(ndarray)
+                if flat.dtype.name == "float32":
+                    # Deferred import: reads the CURRENT flag value on
+                    # every call (set at bootstrap from Settings).
+                    from ..codecs.json import json_compact_floats_enabled
+
+                    if json_compact_floats_enabled():
+                        # Opt-in (rest_json_compact_floats): orjson
+                        # writes the shortest float32 round-trip repr —
+                        # ~50% smaller responses, same float32 values,
+                        # DIFFERENT text than the default widened form.
+                        return flat
+                    # The byte-preserving bridge (default): float32 ->
+                    # float64 renders exactly what the tolist path
+                    # renders.
+                    return flat.astype("float64")
+                if flat.dtype.name in (
+                    "float64",
+                    "int8",
+                    "int16",
+                    "int32",
+                    "int64",
+                    "uint8",
+                    "uint16",
+                    "uint32",
+                    "uint64",
+                    "bool",
+                ):
+                    return flat
+                # Non-native dtypes fall through to the list path.
+            as_list = flat.tolist()
+            if flat.dtype.kind in "fc" and isnan(flat).any():
+                from math import isnan as _isnan
+
+                # Complex NaN: numpy's isnan is True for complex(nan, 0),
+                # but math.isnan raises TypeError on complex values —
+                # check the real and imaginary parts separately.
+                # Masked entries are already None from tolist(): keep
+                # them instead of feeding None to math.isnan.
+                def _elem_isnan(v):
+                    if v is None:
+                        return False
+                    if isinstance(v, complex):
+                        return _isnan(v.real) or _isnan(v.imag)
+                    return _isnan(v)
+
+                as_list = [None if _elem_isnan(v) else v for v in as_list]
+            # Route the converted list back through the handler so the
+            # caller's include/exclude filters apply: returning the raw
+            # list bypasses them, and the list-rooted instance simply
+            # takes the plain handler path below (no recursion).
+            return handler(type(self)(root=as_list))
+
+        return handler(self)
+
 
 class RepositoryLoadErrorResponse(BaseModel):
     error: str | None = None
