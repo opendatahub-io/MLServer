@@ -343,12 +343,14 @@ jobs:
               }' > /tmp/slack-payload.json
           else
             # --- Skip notification ---
+            if [[ "$DOWNLOAD_OUTCOME" == "failure" ]]; then
+              echo "::warning::Skip marker download failed — ignoring any downloaded markers."
+              echo "should_send=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             shopt -s nullglob
             markers=(/tmp/skip-markers/.skip-*.json)
             if [[ ${#markers[@]} -eq 0 ]]; then
-              if [[ "$DOWNLOAD_OUTCOME" == "failure" ]]; then
-                echo "::warning::Skip marker download failed — possible GitHub API issue."
-              fi
               echo "No skip markers found — nothing to notify."
               echo "should_send=false" >> "$GITHUB_OUTPUT"
               exit 0
