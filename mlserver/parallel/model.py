@@ -27,6 +27,10 @@ class ParallelModel(MLModel):
         self._metadata: MetadataModelResponse | None = None
         self._add_custom_handlers()
 
+    @property
+    def _is_serving(self) -> bool:
+        return self.ready and self._dispatcher.has_ready_workers
+
     def _load_complete(self) -> None:
         self._on_load_complete()
 

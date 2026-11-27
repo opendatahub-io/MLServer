@@ -30,13 +30,15 @@ not establish lifetime ownership for every accepted inference request.
 | Registered | A frontend lookup can find the instance. A fresh loading entry can be registered before it is ready. |
 | Prepared | Runtime loading and load hooks have succeeded for the candidate. A replacement can be prepared without being committed. |
 | Committed | This instance/configuration is the selected generation. Replacement publication occurs before releasing the displaced instance. |
-| Ready | The model's readiness flag is set. Public server readiness also follows existing startup and empty-registry settings. |
+| Ready | The lifecycle flag records successful loading. For a parallel model, public readiness also requires a routable worker and, when using ZeroMQ, a working response receiver. |
 | Routable worker | The dispatcher may select this worker. Quarantine removes eligibility even when committed frontend settings remain intact. |
 | Retired | The instance has lost serving eligibility; it may still own resources or unfinished cleanup. |
 | Released | Cleanup has completed, or native process exit and parent-resource retirement have been confirmed. Removing a dictionary entry is insufficient evidence. |
 
-For example, a published replacement can be ready while its pool is quarantined
-after an unacknowledged cleanup update. An abandoned candidate can be absent from
+For example, a published replacement retains its loaded state while its pool is
+quarantined after an unacknowledged cleanup update. Its model readiness probe
+returns false. Its repository index row, when included, reports `UNAVAILABLE`
+until the pool can serve again. An abandoned candidate can be absent from
 lookups while its native preparation remains owned. Observability must preserve
 these distinctions.
 

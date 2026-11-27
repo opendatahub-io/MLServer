@@ -38,6 +38,8 @@ class ModelRepositoryHandlers:
         # Get models from repository (on disk)
         repository_model_settings = await self._repository.list()
 
+        self._model_registry.forget_missing_load_failures(repository_model_settings)
+
         if payload.include_registry_models:
             # Get all models from registry
             registry_model_settings = [
@@ -56,8 +58,6 @@ class ModelRepositoryHandlers:
         for model_settings in all_model_settings:
             index_item = await self._to_item(model_settings)
             if payload.ready:
-                # TODO: If filtering by ready, we could ready directly from the
-                # active model registry
                 if index_item.state == State.READY:
                     index_items.append(index_item)
             else:
@@ -90,36 +90,32 @@ class ModelRepositoryHandlers:
     async def _to_item(
         self, model_settings: ModelSettings
     ) -> RepositoryIndexResponseItem:
-        item = RepositoryIndexResponseItem(
-            name=model_settings.name,
-            state=State.UNKNOWN,
-            reason="",
-        )
-
-        item.state = await self._get_state(model_settings)
-
-        if model_settings.parameters:
-            item.version = model_settings.parameters.version
-
-        return item
-
-    async def _get_state(self, model_settings: ModelSettings) -> State:
-        """
-        Determine state of a model.
-
-        State mapping:
-        - READY: In registry and successfully loaded
-        - LOADING: In registry and currently loading
-        - UNAVAILABLE: In repository but not in registry
-        """
         version = model_settings.version
         try:
             model = await self._model_registry.get_model(model_settings.name, version)
-            if not model.ready:
-                return State.LOADING
-            return State.READY
         except ModelNotFound:
-            return State.UNAVAILABLE
+            model = None
+
+        reason = ""
+        # A versionless inference lookup can return a different, default version.
+        # Each repository row describes only its exact artifact.
+        if model is None or model.version != version:
+            state = State.UNAVAILABLE
+            if self._model_registry.has_load_failure(model_settings):
+                reason = (
+                    "Model failed to load. See the load response and server logs "
+                    "for details."
+                )
+        elif not model.ready:
+            state = State.LOADING
+        elif not model._is_serving:
+            state = State.UNAVAILABLE
+            reason = "Model is loaded but has no eligible worker."
+        else:
+            state = State.READY
+        return RepositoryIndexResponseItem(
+            name=model_settings.name, version=version, state=state, reason=reason
+        )
 
     def _get_operation_lock(self, name: str) -> asyncio.Lock:
         return self._operation_locks.setdefault(name, asyncio.Lock())
@@ -127,7 +123,12 @@ class ModelRepositoryHandlers:
     @with_operation_lock(lambda self, name: self._get_operation_lock(name))
     @defer_cancellation(lambda self, *args, **kwargs: self._model_operation_timeout)
     async def load(self, name: str) -> bool:
-        all_model_settings = await self._repository.find(name)
+        try:
+            all_model_settings = await self._repository.find(name)
+        except ModelNotFound:
+            self._model_registry.forget_missing_load_failures([], name=name)
+            raise
+        self._model_registry.forget_missing_load_failures(all_model_settings, name=name)
 
         loaded_versions = set()
         for model_settings in all_model_settings:

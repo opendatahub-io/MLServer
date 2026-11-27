@@ -92,6 +92,15 @@ class ParentTransport:
         self._closed = False
         self._close_task: asyncio.Task | None = None
 
+    @property
+    def can_send(self) -> bool:
+        return (
+            not self._closed
+            and self._failure is None
+            and self._receiver is not None
+            and not self._receiver.done()
+        )
+
     def start(
         self,
         resolve: Callable[[ModelResponseMessage], None],
@@ -174,12 +183,7 @@ class ParentTransport:
         exit_code = self._stopped_workers.get(worker)
         if exit_code is not None:
             raise WorkerStop(exit_code)
-        if (
-            self._closed
-            or self._failure is not None
-            or self._receiver is None
-            or self._receiver.done()
-        ):
+        if not self.can_send:
             raise RuntimeError(
                 "ZeroMQ response transport is unavailable"
             ) from self._failure

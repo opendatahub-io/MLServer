@@ -185,18 +185,18 @@ The readiness check answers one question: should traffic be routed to this serve
 | Startup has not completed | not ready |
 | No models in the registry, `empty_registry_readiness: true` (default) | ready |
 | No models in the registry, `empty_registry_readiness: false` | not ready |
-| Models in the registry, `strict_readiness: true` (default) | ready only if all models in the registry are ready |
+| Models in the registry, `strict_readiness: true` (default) | ready only if every registered model can serve inference |
 | Models in the registry, `strict_readiness: false` | ready; model readiness is ignored |
 
 Both settings can be set with the `MLSERVER_STRICT_READINESS` and `MLSERVER_EMPTY_REGISTRY_READINESS` environment variables, or in `settings.json`.
 
 #### Strict mode (default)
 
-`strict_readiness: true` follows the V2 inference protocol, where server ready means all models are ready. The server is ready when every model in the registry is ready. A new model or model version is in the registry with `ready` false only while it is being loaded, and one that fails to load is removed from the registry. So the server is not ready while a new model or model version is loading, including when it is loaded through the model repository API after startup. Reloading a version that is already loaded does not affect readiness: the existing model stays in the registry, ready, until the new one has loaded.
+`strict_readiness: true` follows the V2 inference protocol, where server ready means all registered models can serve inference. A fresh model or version can enter the registry before it finishes loading, so strict readiness becomes false during that load, including loads through the repository API. A failed initial load has no published serving instance. During replacement preparation, the existing instance remains selected and can continue serving. Worker loss during recovery is described under [Model availability and routing](#model-availability-and-routing).
 
 #### Lenient mode
 
-`strict_readiness: false` model readiness is ignored after startup; an empty registry follows `empty_registry_readiness`. So the server stays ready while a new model or model version is loading. Loading models dynamically therefore does not block traffic to the models that are already loaded, or further requests to load and unload models. This deliberately departs from the protocol and suits deployments that load models dynamically after startup. In either mode, check individual models with `GET /v2/models/{name}/ready`. In lenient mode it is the only readiness signal for models.
+`strict_readiness: false` ignores model readiness after startup; an empty registry follows `empty_registry_readiness`. A nonempty server therefore stays ready while a model loads or loses all eligible workers. This permits traffic to other loaded models and further lifecycle requests, provided the deployment routes to the pod. This deliberately departs from the protocol and suits deployments that load models dynamically after startup. In either mode, check individual models with `GET /v2/models/{name}/ready` or inspect the repository index for selected model versions.
 
 #### Empty registry
 
@@ -214,6 +214,81 @@ If `empty_registry_readiness` is `false` and no models were loaded once startup 
 #### Startup
 
 In both modes the server is not ready until startup completes, so traffic is not routed before the initial models have loaded. If a model fails to load at startup, the server shuts down.
+
+#### Model availability and routing
+
+For a parallel model, model readiness requires at least one worker eligible to
+serve its pool. If recovery withdraws all of those workers or the pool's
+ZeroMQ response receiver fails permanently, the model probe
+returns false. Its repository index row, when included, reports `UNAVAILABLE`.
+Strict server readiness also becomes false. Lenient server readiness keeps its
+configured behavior, including when every loaded model has lost its workers.
+An independent pool can still serve its models. Probes only observe state.
+After worker recovery, the pool restores eligibility once replay succeeds.
+A terminal receiver failure persists for the lifetime of that transport.
+Once unloading the last model retires a named pool, the next load for that
+pool starts a fresh receiver.
+
+For direct versioned inference through REST or gRPC, an absent model returns
+HTTP 404 or gRPC `NOT_FOUND`. A registered candidate still loading returns
+HTTP 400 or `INVALID_ARGUMENT`. If a loaded model's pool has no eligible
+workers available for selection, inference returns HTTP 503 or the existing
+gRPC `UNKNOWN` status with the no-workers error. A terminal ZeroMQ response
+transport failure with workers still selected surfaces as HTTP 500 or gRPC
+`INTERNAL`. A replica withdrawn by the platform may instead be
+unreachable through the Service.
+
+Choose the probe together with the replica layout. When a pod readiness probe
+uses server readiness, strict mode withdraws a partially available pod from its
+Service after the readiness failure threshold, including for its healthy
+models. Lenient mode keeps a nonempty pod eligible after startup. If clients
+must reach a serving pod whenever one exists, the platform must maintain the
+required catalog and availability across ready pods or route by the requested
+model and version.
+A repository load updates only the pod that receives it.
+
+Check the probes on the deployed KServe predictor. The MLServer CPU and CUDA
+templates observed in the tested OpenShift AI 3.5.3 installation declared
+`multiModel: false` and used `/v2/models/{{.Name}}/ready` for both readiness
+and liveness. Removing that named model can withdraw the replica even while
+another model serves correctly.
+If it stays unavailable through the liveness failure threshold, Kubernetes
+restarts the container.
+
+For a deployment that uses the server-wide policy above, point the runtime's
+readiness probe at `/v2/health/ready` and its liveness probe at `/v2/health/live`.
+The generated inference Route can send a versioned request to any ready
+replica. With strict readiness, unloading a model from just one replica can
+therefore produce intermittent HTTP 404s for that model while the replica's
+remaining models are ready.
+
+For a KServe predictor with configurable server-wide probes, choose the
+settings together. These profiles assume the startup probe supports the
+`CHECK_REPOSITORY_POPULATED` switch.
+
+| Setting | Static catalog loaded at startup | Dynamic catalog starting empty |
+|---|---|---|
+| `CHECK_REPOSITORY_POPULATED` (ServingRuntime startup probe) | `true` | `false` |
+| `MLSERVER_LOAD_MODELS_AT_STARTUP` | `true` | `false` |
+| `MLSERVER_STRICT_READINESS` | `true` | `false` |
+| `MLSERVER_EMPTY_REGISTRY_READINESS` | `false` | `true` |
+
+The static profile withdraws the endpoint when the last model is unloaded.
+The dynamic profile keeps an empty endpoint reachable so an authorized client
+can load the first model through the Service. The startup switch controls
+only the filesystem check. MLServer still reports unready until startup finishes.
+
+Predictor pods of one InferenceService revision are intended to converge on
+the same catalog and configuration. A repository request through the Service
+reaches one ready pod. The platform must reconcile catalog changes on the
+others, including new pods and those returning from withdrawal. MLServer can
+report which models its own workers can serve.
+
+The intended access policy reserves catalog changes for model administrators
+and permits inference clients to invoke published models. The platform must
+enforce those permissions on the exposed APIs. An authorized pod port-forward
+can diagnose a withdrawn replica. Catalog recovery in a supported deployment
+requires a platform-managed path to restore the intended state.
 
 ---
 

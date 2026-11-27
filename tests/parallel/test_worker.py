@@ -1,10 +1,17 @@
+import asyncio
 from multiprocessing import Queue
+
+import pytest
 
 from mlserver.settings import ModelSettings
 from mlserver.codecs import StringCodec
 from mlserver.parallel.errors import WorkerError
 from mlserver.parallel.worker import Worker
-from mlserver.parallel.messages import ModelUpdateMessage, ModelRequestMessage
+from mlserver.parallel.messages import (
+    ModelUpdateMessage,
+    ModelRequestMessage,
+    ModelUpdateType,
+)
 
 
 async def test_predict(
@@ -76,6 +83,37 @@ async def test_load_model(
     assert len(loaded_models) == 2
     assert loaded_models[0].name == load_message.model_settings.name
     assert loaded_models[1].name == new_load_message.model_settings.name
+
+
+@pytest.mark.parametrize(
+    "worker_timeout, runtime_timeout, interrupted", [(5, 0, False), (0.05, None, True)]
+)
+async def test_load_timeout_source(
+    worker,
+    responses,
+    error_model_settings,
+    worker_timeout,
+    runtime_timeout,
+    interrupted,
+):
+    async def load_hook(model):
+        async with asyncio.timeout(runtime_timeout):
+            await asyncio.Event().wait()
+        return model
+
+    worker._model_registry._model_operation_timeout = worker_timeout
+    worker._model_registry._on_model_load = [load_hook]
+    update = ModelUpdateMessage(
+        update_type=ModelUpdateType.Load, model_settings=error_model_settings
+    )
+    worker.send_update(update)
+    reply = responses.get(timeout=10)
+
+    assert reply.id == update.id
+    assert isinstance(reply.exception, WorkerError)
+    # Both timers yield the same exception text on the wire.
+    assert str(reply.exception) == "builtins.TimeoutError: "
+    assert reply.exception._interrupted is interrupted
 
 
 async def test_unload_model(

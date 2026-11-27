@@ -20,7 +20,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RepositoryIndexResponse"
-      description: "The index API returns information about every model available in a model repository, even if it is not currently loaded into Triton. The index API provides a way to determine which models can potentially be loaded by the Load API. A model-repository index request is made with an HTTP POST to the index endpoint. In the corresponding response the HTTP body contains the JSON response."
+      description: "The index API returns information about every model available in a model repository, even if it is not currently loaded into MLServer. The index API provides a way to determine which models can potentially be loaded by the Load API. A model-repository index request is made with an HTTP POST to the index endpoint. In the corresponding response the HTTP body contains the JSON response."
       requestBody:
         content:
           application/json:
@@ -49,7 +49,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RepositoryLoadErrorResponse"
-      description: "The load API requests that a model be loaded into Triton, or reloaded if the model is already loaded. A load request is made with an HTTP POST to a load endpoint. A successful load request is indicated by a 200 HTTP status."
+      description: "The load API requests that a model be loaded into MLServer, or reloaded if the model is already loaded. A load request is made with an HTTP POST to a load endpoint. A successful load request is indicated by a 200 HTTP status."
       tags:
         - extension
         - model
@@ -73,7 +73,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RepositoryUnloadErrorResponse"
-      description: The unload API requests that a model be unloaded from Triton. An unload request is made with an HTTP POST to an unload endpoint. A successful unload request is indicated by a 200 HTTP status.
+      description: The unload API requests that a model be unloaded from MLServer. An unload request is made with an HTTP POST to an unload endpoint. A successful unload request is indicated by a 200 HTTP status.
       tags:
         - extension
         - model

@@ -122,7 +122,7 @@ class DataPlane:
         # Apply strict or lenient readiness mode based on setting
         if self._settings.strict_readiness:
             # Strict mode (V2 protocol compliant): ALL models must be ready
-            return all(model.ready for model in models)
+            return all(model._is_serving for model in models)
         else:
             # Lenient mode: model state is ignored so that a model that is still
             # loading doesn't block traffic to any other loaded models or new
@@ -131,7 +131,7 @@ class DataPlane:
 
     async def model_ready(self, name: str, version: str | None = None) -> bool:
         model = await self._model_registry.get_model(name, version)
-        return model.ready
+        return model._is_serving
 
     async def metadata(self) -> MetadataServerResponse:
         # Built-in extensions that are always available

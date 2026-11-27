@@ -77,7 +77,7 @@ curl -X POST http://localhost:8080/v2/repository/models/my-model/load
 curl -X POST http://localhost:8080/v2/repository/models/my-model/unload
 ```
 
-Reloading an already-loaded model performs a rolling deployment: the new version is loaded before the old one is unloaded, ensuring at least one version is always available.
+Reloading an already-loaded version prepares a replacement while the current instance remains selected. A failed preparation leaves the current instance in place. If every worker in its pool loses serving eligibility during recovery, the model can temporarily report unavailable even though its lifecycle flag still says loaded.
 
 ---
 
@@ -108,7 +108,7 @@ A batch is dispatched when either threshold is reached (whichever comes first).
 Check these in order:
 
 1. **Startup not complete** — During initial model loading, the server always reports not ready. Wait for all models to finish loading.
-2. **Model load failure** — Check logs for "Couldn't load model" errors. Failed models are removed from the registry.
+2. **Model load failure** — For an explicit load, check its API response and the server logs. If the server stays running and the failed version remains in the repository, its index row gives a bounded failure reason. A failed initial load has no published serving instance; a failed replacement preparation leaves the previous instance selected.
 3. **A model is loading** — With `strict_readiness: true` (default), the server reports not ready while a new model or model version is loading, including models loaded through the model repository API. With `strict_readiness: false`, loading does not affect readiness; check models individually via `/v2/models/{name}/ready`.
 4. **`empty_registry_readiness: false`** — If no models are loaded and this setting is false, the server reports not ready, in both strict and lenient mode.
 

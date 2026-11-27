@@ -430,9 +430,9 @@ class Settings(BaseSettings):
 
     Set this to False when models are loaded dynamically after startup.
     A new model or model version is not ready while it loads, so with True the
-    server is not ready during the load. With False it stays ready, so the
-    traffic to the server is not blocked, including requests to
-    already loaded models and future model lifecycle operations. This
+    server is not ready during the load. With False a nonempty server stays
+    ready, allowing traffic to already loaded models and future model lifecycle
+    operations when the deployment routes to it. This
     deliberately departs from the V2 protocol. Check individual models through
     the model ready endpoint.
 

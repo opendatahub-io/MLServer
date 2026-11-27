@@ -9,6 +9,7 @@ from mlserver.batching.adaptive import AdaptiveBatcher
 from mlserver.handlers import DataPlane
 from mlserver.settings import ModelSettings
 from mlserver.model import MLModel
+from mlserver.parallel.errors import NoWorkersAvailable
 from mlserver.registry import MultiModelRegistry
 from mlserver.types import (
     InferenceRequest,
@@ -141,6 +142,27 @@ async def test_infer(
     prediction = InferenceResponse.model_validate(response.json())
     assert len(prediction.outputs) == 1
     assert prediction.outputs[0].data == TensorData(root=[6])
+
+
+async def test_infer_returns_503_when_no_worker_is_eligible(
+    rest_client: AsyncClient,
+    data_plane: DataPlane,
+    sum_model_settings,
+    inference_request,
+    mocker,
+):
+    model = await data_plane._model_registry.get_model(sum_model_settings.name)
+    mocker.patch.object(model, "predict", side_effect=NoWorkersAvailable)
+    response = await rest_client.post(
+        f"/v2/models/{sum_model_settings.name}/versions/"
+        f"{sum_model_settings.version}/infer",
+        json=inference_request.model_dump(),
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": "No workers are currently available to handle requests."
+    }
 
 
 async def test_infer_single_adaptive_batch_preserves_output_parameters(

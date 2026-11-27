@@ -60,6 +60,11 @@ class MLModel:
         self._mlserver_log_level = get_log_level()
         self._configure_framework_logger()
 
+    @property
+    def _is_serving(self) -> bool:
+        """Whether this model currently has confirmed capacity for inference."""
+        return self.ready
+
     def _configure_framework_logger(self) -> None:
         """Configure framework-specific logging to match MLServer's log level.
 
@@ -81,8 +86,8 @@ class MLModel:
         This method will be called on each of the parallel workers (when
         :doc:`parallel inference </user-guide/parallel-inference>`) is
         enabled).
-        Its return value will represent the model's readiness status.
-        A return value of ``True`` will mean the model is ready.
+        A return value of ``True`` means runtime loading succeeded. Public
+        readiness of a parallel model also requires an eligible worker.
 
         **This method can be overriden to implement your custom load
         logic.**

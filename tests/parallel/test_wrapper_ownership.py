@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from mlserver.parallel.errors import WorkerError
+from mlserver.parallel.dispatcher import DispatchUpdateSettlement
 from mlserver.parallel.pool import InferencePool
 from mlserver.parallel.registry import InferencePoolRegistry
 from mlserver.errors import ModelLoadError, ModelUnloadError
@@ -42,7 +43,7 @@ async def test_wrapper_failure_preserves_frontend_and_replay(
     await pool.start()
 
     async def acknowledge(message):
-        pass
+        return DispatchUpdateSettlement([])
 
     monkeypatch.setattr(pool._dispatcher, "dispatch_update", acknowledge)
     frontend = MultiModelRegistry(

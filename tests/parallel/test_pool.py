@@ -11,6 +11,10 @@ from mlserver.settings import Settings, ModelSettings
 from mlserver.types import InferenceRequest
 from mlserver.codecs import NumpyCodec, StringCodec
 from mlserver.parallel.pool import InferencePool, WorkerRegistry
+from mlserver.parallel.dispatcher import DispatchUpdateSettlement
+from mlserver.parallel.errors import WorkerError
+from mlserver.parallel.messages import ModelUpdateMessage, ModelUpdateType
+from mlserver.registry import _ModelLoadHook, _model_load_hook
 from mlserver.parallel.worker import Worker
 from mlserver.parallel.errors import InferencePoolUnavailable
 
@@ -325,7 +329,7 @@ async def test_start_worker_waits_for_load_lock(
     async def controlled_dispatch(_message):
         dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -375,7 +379,7 @@ async def test_load_model_serializes(
         if dispatch_count == 1:
             dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -414,7 +418,7 @@ async def test_load_and_unload_serialize(
         if dispatch_count == 1:
             dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -443,7 +447,7 @@ async def test_load_and_close_serialize(
     async def controlled_dispatch(_message):
         dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -521,7 +525,7 @@ async def test_load_model_cancellation_settles_and_preserves_tracking(
     async def controlled_dispatch(_message):
         dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -541,6 +545,64 @@ async def test_load_model_cancellation_settles_and_preserves_tracking(
     assert inference_pool.has_model(sum_model.settings)
 
 
+async def test_cancelled_load_observes_late_dispatch_failure(
+    sum_model: MLModel, mocker
+):
+    dispatch_started = asyncio.Event()
+    dispatch_finished = asyncio.Event()
+    release_dispatch = asyncio.Event()
+    late_failure = WorkerError(ValueError("late load failed"))
+
+    async def controlled_dispatch(_message):
+        dispatch_started.set()
+        try:
+            await release_dispatch.wait()
+            return DispatchUpdateSettlement([], late_load_failure=late_failure)
+        finally:
+            dispatch_finished.set()
+
+    dispatcher = Mock()
+    dispatcher.dispatch_update = controlled_dispatch
+    inference_pool = object.__new__(InferencePool)
+    inference_pool._owned_dispatcher = dispatcher
+    mocker.patch.object(inference_pool, "_begin_recovery")
+
+    hook = _ModelLoadHook(asyncio.current_task())
+    token = _model_load_hook.set(hook)
+    try:
+        message = ModelUpdateMessage(
+            update_type=ModelUpdateType.Load,
+            model_settings=sum_model.settings,
+        )
+        dispatch_task = asyncio.create_task(
+            inference_pool._dispatch_owned(message, sum_model)
+        )
+        await dispatch_started.wait()
+
+        dispatch_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await dispatch_task
+
+        observed = []
+        observed_event = asyncio.Event()
+
+        def record(error):
+            observed.append(error)
+            observed_event.set()
+
+        observe = next(iter(hook.settlements.values()))
+        observe(record)
+        release_dispatch.set()
+        await asyncio.wait_for(observed_event.wait(), timeout=1)
+
+        assert observed == [late_failure]
+    finally:
+        release_dispatch.set()
+        if dispatch_started.is_set():
+            await asyncio.wait_for(dispatch_finished.wait(), timeout=1)
+        _model_load_hook.reset(token)
+
+
 async def test_reload_cancellation_settles_and_preserves_pending_state(
     inference_pool: InferencePool, sum_model: MLModel, mocker
 ):
@@ -552,7 +614,7 @@ async def test_reload_cancellation_settles_and_preserves_pending_state(
     async def controlled_dispatch(_message):
         dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -588,7 +650,7 @@ async def test_unload_model_cancellation_settles_and_clears_tracking(
     async def controlled_dispatch(_message):
         dispatch_started.set()
         await release_dispatch.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     mocker.patch.object(
         inference_pool._dispatcher,
@@ -616,7 +678,12 @@ async def test_failed_reload_preserves_committed_model_for_rollback(
     dispatch = mocker.patch.object(
         inference_pool._dispatcher,
         "dispatch_update",
-        side_effect=[RuntimeError("replacement load failed"), []],
+        side_effect=[
+            DispatchUpdateSettlement(
+                [], primary_error=RuntimeError("replacement load failed")
+            ),
+            DispatchUpdateSettlement([]),
+        ],
     )
 
     with pytest.raises(RuntimeError, match="replacement load failed"):
@@ -627,7 +694,7 @@ async def test_failed_reload_preserves_committed_model_for_rollback(
     assert model_key not in inference_pool._pending_reload
 
     dispatch.side_effect = None
-    dispatch.return_value = []
+    dispatch.return_value = DispatchUpdateSettlement([])
     await inference_pool.unload_model(replacement)
 
     assert inference_pool.has_model(sum_model.settings)

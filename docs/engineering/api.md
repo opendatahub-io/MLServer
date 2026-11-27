@@ -22,7 +22,7 @@ All REST endpoints live under the `/v2` prefix and follow the V2 Inference Proto
 
 | Method | Path | Description | Response |
 |--------|------|-------------|----------|
-| GET | `/v2/health/live` | Server liveness probe | `200` if alive, `400` otherwise |
+| GET | `/v2/health/live` | Server liveness probe | `200` while MLServer responds; model availability is not checked |
 | GET | `/v2/health/ready` | Server readiness probe | `200` if ready, `400` otherwise |
 
 ### Server Metadata
@@ -58,8 +58,8 @@ All REST endpoints live under the `/v2` prefix and follow the V2 Inference Proto
 
 | Method | Path | Description | Response Body |
 |--------|------|-------------|---------------|
-| GET | `/v2/models/{model_name}/ready` | Model readiness | `200` / `400` |
-| GET | `/v2/models/{model_name}/versions/{version}/ready` | Versioned model readiness | `200` / `400` |
+| GET | `/v2/models/{model_name}/ready` | Model readiness | `200` ready, `400` unavailable, `404` absent |
+| GET | `/v2/models/{model_name}/versions/{version}/ready` | Versioned model readiness | `200` ready, `400` unavailable, `404` absent |
 | GET | `/v2/models/{model_name}` | Model metadata | `MetadataModelResponse` |
 | GET | `/v2/models/{model_name}/versions/{version}` | Versioned model metadata | `MetadataModelResponse` |
 | POST | `/v2/models/{model_name}/infer` | Run inference | `InferenceResponse` |
@@ -234,13 +234,42 @@ MLServer-specific `include_registry_models` extension:
   {
     "name": "mushroom-xgboost",
     "version": null,
-    "state": "LOADING",
-    "reason": "Model is being loaded"
+    "state": "UNAVAILABLE",
+    "reason": "Model is loaded but has no eligible worker."
   }
 ]
 ```
 
-Model states: `UNKNOWN`, `READY`, `UNAVAILABLE`, `LOADING`, `UNLOADING`.
+The schema allows `UNKNOWN`, `READY`, `UNAVAILABLE`, `LOADING`, and `UNLOADING`.
+The current index implementation emits `READY`, `UNAVAILABLE`, and `LOADING`.
+
+Each index row describes the exact repository name and version on this replica.
+An unversioned row can be unavailable while versionless inference still succeeds
+on the replica's default version.
+
+For a confirmed initial load failure, the `UNAVAILABLE` row reports
+“Model failed to load. See the load response and server logs for details.”
+The server remembers a failure for that exact name and version until it
+successfully publishes the version or observes its removal from the catalog.
+If an initial load times out, the caller receives the timeout. If the runtime
+later raises an exception (including its own `TimeoutError`) or returns `False`,
+the server logs the cause and records the bounded reason if the attempt is still
+current. If the worker also reaches its own `model_operation_timeout`, that
+deadline alone does not confirm a runtime failure.
+Observing catalog removal invalidates the attempt, even if the same version
+reappears before preparation finishes. A pending or cancelled preparation, or a
+successful preparation abandoned at the deadline, does not create a failure record.
+
+A failed replacement does not create an initial-load failure record. If the
+previous instance can still serve, its row stays `READY` with an empty reason.
+A loaded instance with no eligible worker reports `UNAVAILABLE` with the reason
+“Model is loaded but has no eligible worker.” This can happen when a replacement
+times out and the pool is quarantined.
+
+During a retry, a `LOADING` row has an empty reason. Unloading a model by name
+preserves the reasons for versions that failed to load. Versions that were
+serving become `UNAVAILABLE` with an empty reason. A version with no load
+attempts also has an empty reason.
 
 ---
 
@@ -344,7 +373,7 @@ Errors return appropriate HTTP status codes with a JSON body:
 
 ```json
 {
-  "error": "Model 'unknown-model' not found."
+  "error": "Model unknown-model not found"
 }
 ```
 
@@ -353,20 +382,23 @@ Errors return appropriate HTTP status codes with a JSON body:
 | `ModelNotFound` | 404 |
 | `ModelNotReady` | 400 |
 | `InferenceError` | 400 |
-| `InvalidModelURI` | 400 |
+| `InvalidModelURI` or `ModelLoadError` | 422 |
+| `NoWorkersAvailable` | 503 |
 | Server error | 500 |
 
 ### gRPC Errors
 
 MLServer errors are mapped to gRPC status codes:
 
-| Error Type | gRPC Status |
+| HTTP status on `MLServerError` | gRPC status |
 |-----------|-------------|
-| `ModelNotFound` | `NOT_FOUND` |
-| `ModelNotReady` | `FAILED_PRECONDITION` |
-| `InferenceError` | `INVALID_ARGUMENT` |
-| Other `MLServerError` | `INVALID_ARGUMENT` |
-| Unexpected exception | `INTERNAL` |
+| 400 (for example, `ModelNotReady`) | `INVALID_ARGUMENT` |
+| 404 (`ModelNotFound`) | `NOT_FOUND` |
+| 422 (for example, `ModelLoadError`) | `FAILED_PRECONDITION` |
+| 500 (`ModelUnloadError`) | `INTERNAL` |
+| 503 (`NoWorkersAvailable`) | `UNKNOWN` |
+
+Unexpected exceptions use gRPC `INTERNAL`.
 
 ---
 

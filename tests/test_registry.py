@@ -14,7 +14,7 @@ from mlserver.errors import (
 from mlserver.registry import MultiModelRegistry, SingleModelRegistry, model_initialiser
 from mlserver.settings import ModelSettings, ModelParameters
 
-from .fixtures import SlowModel, SumModel
+from .fixtures import SlowModel
 
 
 @pytest.fixture
@@ -114,7 +114,7 @@ async def test_reload_model(
         await release.wait()
         return True
 
-    mocker.patch.object(SlowModel, "load", new=controlled_load)
+    mocker.patch.object(sum_model_settings.implementation, "load", new=controlled_load)
     existing_model = await model_registry.get_model(sum_model_settings.name)
     reload_task = asyncio.create_task(model_registry.load(sum_model_settings))
     await started.wait()
@@ -339,7 +339,7 @@ async def test_cancelled_load_settles_and_marks_model_ready(
         await finish.wait()
         return True
 
-    mocker.patch.object(SlowModel, "load", new=controlled_load)
+    mocker.patch.object(slow_model_settings.implementation, "load", new=controlled_load)
 
     load_task = asyncio.create_task(model_registry.load(slow_model_settings))
     await started.wait()
@@ -375,7 +375,7 @@ async def test_cancelled_reload_settles_and_replaces_model(
         await finish.wait()
         return True
 
-    mocker.patch.object(SlowModel, "load", new=controlled_load)
+    mocker.patch.object(sum_model_settings.implementation, "load", new=controlled_load)
     old_model = await model_registry.get_model(sum_model_settings.name)
     reload_task = asyncio.create_task(model_registry.load(sum_model_settings))
     await started.wait()
@@ -460,7 +460,7 @@ async def test_single_model_registry_load_cancellation_settles(
         await finish.wait()
         return True
 
-    mocker.patch.object(SumModel, "load", new=controlled_load)
+    mocker.patch.object(sum_model_settings.implementation, "load", new=controlled_load)
     registry = SingleModelRegistry(sum_model_settings)
     load_task = asyncio.create_task(registry.load(sum_model_settings))
     await started.wait()
@@ -492,7 +492,7 @@ async def test_single_model_registry_reload_cancellation_settles(
         await finish.wait()
         return True
 
-    mocker.patch.object(SumModel, "load", new=controlled_load)
+    mocker.patch.object(sum_model_settings.implementation, "load", new=controlled_load)
     reload_task = asyncio.create_task(registry.load(sum_model_settings))
     await started.wait()
 

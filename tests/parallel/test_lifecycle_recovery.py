@@ -5,11 +5,16 @@ import os
 
 import pytest
 
+from mlserver.handlers.dataplane import DataPlane
+from mlserver.errors import ModelNotFound
+from mlserver.handlers.model_repository import ModelRepositoryHandlers
 from mlserver.parallel.errors import NoWorkersAvailable
+from mlserver.parallel.dispatcher import DispatchUpdateSettlement
 from mlserver.parallel.pool import InferencePool
 from mlserver.parallel.messages import ModelRequestMessage
 from mlserver.registry import MultiModelRegistry
 from mlserver.settings import ModelSettings, ModelParameters
+from mlserver.types import RepositoryIndexRequest, State
 from tests.fixtures import ErrorModel
 
 
@@ -29,7 +34,7 @@ async def test_timeout_quarantines_until_rollback(
     async def dispatch(message):
         entered.set()
         await release.wait()
-        return []
+        return DispatchUpdateSettlement([])
 
     monkeypatch.setattr(pool._dispatcher, "dispatch_update", dispatch)
     operation = asyncio.create_task(pool.load_model(sum_model))
@@ -51,7 +56,7 @@ async def test_timeout_quarantines_until_rollback(
 
 
 async def controlled_worker_load(model):
-    """Existing trusted SumModel, with file barriers visible across spawn."""
+    """Pause before the runtime's load method using files visible across spawn."""
     directory = model.settings.parameters.extra.get("lifecycle_barrier")
     if directory:
         path = Path(directory)
@@ -68,9 +73,275 @@ async def wait_until(predicate):
         await asyncio.sleep(0.01)
 
 
+@pytest.mark.parametrize("transport", ["queue", "zmq"])
+async def test_only_registry_hook_calls_stage_pool_loads(
+    settings, sum_model, transport
+):
+    if transport == "zmq":
+        pytest.importorskip("zmq")
+    settings.parallel_inference_transport = transport
+    settings.parallel_workers = 1
+    pool = InferencePool(settings)
+    managed = sum_model.settings.model_copy(deep=True, update={"name": "managed"})
+
+    async def check_staged(model):
+        assert not pool.has_model(model.settings)
+        return model
+
+    class Hooks(list):
+        def __iter__(self):
+            # This independent task inherits the context used to enumerate hooks.
+            tasks.create_task(pool.load_model(sum_model))
+            return super().__iter__()
+
+    registry = MultiModelRegistry(on_model_load=Hooks([pool.load_model, check_staged]))
+    async with asyncio.timeout(30):
+        await pool.start()
+        try:
+            async with asyncio.TaskGroup() as tasks:
+                await registry.load(managed)
+            assert pool.has_model(managed)
+            assert pool.has_model(sum_model.settings)
+            assert not pool._staged
+        finally:
+            await pool.close()
+
+
+@pytest.mark.parametrize(
+    "delegation",
+    ["await", "handled", "handled-same-candidate", "completed-hook", "outlives-hook"],
+)
+async def test_load_hook_attributes_only_its_own_worker_failure(
+    settings, sum_model, load_error_model, tmp_path, delegation
+):
+    settings.parallel_workers = 1
+    settings.model_operation_timeout = 15
+    pool = InferencePool(settings, on_worker_load=[controlled_worker_load])
+    load_error_model.settings.parameters.extra["lifecycle_barrier"] = str(tmp_path)
+    waiting = asyncio.Event()
+    target = load_error_model.settings.model_copy(deep=True)
+    target.parameters.version = "requested"
+    worker_load = None
+
+    async with asyncio.timeout(30):
+        await pool.start()
+        (pid,) = pool._workers
+        release = tmp_path / f"release-{pid}"
+        try:
+
+            async def cancel_worker_load():
+                assert worker_load is not None
+                worker_load.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await worker_load
+
+            async def first_hook(model):
+                nonlocal worker_load
+                if delegation == "await":
+                    # The hook delegates its own preparation to a different instance.
+                    return await pool.load_model(load_error_model)
+                candidate = (
+                    model
+                    if delegation == "handled-same-candidate"
+                    else load_error_model
+                )
+                worker_load = asyncio.create_task(pool.load_model(candidate))
+                await wait_until((tmp_path / f"entered-{pid}").exists)
+                if delegation == "outlives-hook":
+                    return model
+                await cancel_worker_load()
+                if delegation == "completed-hook":
+                    return model
+                return await later_hook(model)
+
+            async def later_hook(model):
+                if delegation == "outlives-hook":
+                    await cancel_worker_load()
+                waiting.set()
+                await asyncio.Event().wait()
+
+            registry = MultiModelRegistry(
+                on_model_load=[first_hook, later_hook],
+                model_operation_timeout=1,
+            )
+            # Warm the worker before applying the frontend deadline.
+            await pool.load_model(sum_model)
+            with pytest.raises(asyncio.TimeoutError):
+                await registry.load(target)
+            assert (tmp_path / f"entered-{pid}").exists()
+            assert waiting.is_set() is (delegation != "await")
+            assert not registry.has_load_failure(target)
+            release.touch()
+            await pool._settle_recovery()
+            assert registry.has_load_failure(target) is (delegation == "await")
+            assert not registry.has_load_failure(load_error_model.settings)
+        finally:
+            release.touch()
+            await pool.close()
+
+
+async def test_cancelled_task_group_reports_already_settled_worker_load(
+    settings, sum_model, load_error_model, tmp_path
+):
+    settings.parallel_workers = 1
+    settings.model_operation_timeout = 15
+    pool = InferencePool(settings, on_worker_load=[controlled_worker_load])
+    candidate = load_error_model.settings
+    candidate.parameters.extra["lifecycle_barrier"] = str(tmp_path)
+
+    async def load_in_group(model):
+        try:
+            async with asyncio.TaskGroup() as group:
+                load = group.create_task(pool.load_model(model))
+        except asyncio.CancelledError:
+            # Let the worker fail and rollback finish before the task group
+            # passes its own cancellation back to the registry.
+            assert entered.exists()
+            release.touch()
+            await pool._settle_recovery()
+            assert not registry.has_load_failure(candidate)
+            raise
+        return load.result()
+
+    registry = MultiModelRegistry(
+        on_model_load=[load_in_group], on_model_unload=[pool.unload_model]
+    )
+    async with asyncio.timeout(30):
+        await pool.start()
+        (pid,) = pool._workers
+        entered = tmp_path / f"entered-{pid}"
+        release = tmp_path / f"release-{pid}"
+        try:
+            await registry.load(sum_model.settings)
+            registry._model_operation_timeout = 1
+            with pytest.raises(asyncio.TimeoutError):
+                await registry.load(candidate)
+            await registry._models[candidate.name]._drain_cleanup()
+            assert registry.has_load_failure(candidate)
+            assert not registry.has_load_failure(sum_model.settings)
+            assert not pool.has_model(candidate)
+        finally:
+            release.touch()
+            await pool.close()
+
+
+@pytest.mark.parametrize("transport", ["queue", "zmq"])
+@pytest.mark.parametrize(
+    "outcome",
+    ["exception", "runtime-timeout", "false", "success", "removed", "worker-timeout"],
+)
+async def test_abandoned_worker_load_index_reason(
+    settings,
+    sum_model_settings,
+    model_repository,
+    inference_request,
+    tmp_path,
+    mocker,
+    caplog,
+    transport,
+    outcome,
+):
+    if transport == "zmq":
+        pytest.importorskip("zmq")
+    settings.parallel_workers = 1
+    settings.parallel_inference_transport = transport
+    settings.model_operation_timeout = 5 if outcome == "worker-timeout" else 15
+    pool = InferencePool(settings, on_worker_load=[controlled_worker_load])
+    registry = MultiModelRegistry(
+        on_model_load=[pool.load_model],
+        on_model_unload=[pool.unload_model],
+        model_operation_timeout=15,
+    )
+    candidate = ModelSettings(
+        name=sum_model_settings.name,
+        implementation=ErrorModel,
+        parameters=ModelParameters(
+            version="candidate",
+            extra={"lifecycle_barrier": str(tmp_path)},
+            load_error=outcome in ("exception", "removed"),
+            load_timeout=outcome == "runtime-timeout",
+            load_returns_false=outcome == "false",
+        ),
+    )
+    catalog = [sum_model_settings, candidate]
+    mocker.patch.object(model_repository, "list", return_value=catalog)
+    repository = ModelRepositoryHandlers(model_repository, registry)
+
+    async def index():
+        return {
+            item.version: (item.state, item.reason)
+            for item in await repository.index(RepositoryIndexRequest())
+        }
+
+    async with asyncio.timeout(45):
+        await pool.start()
+        (pid,) = pool._workers
+        release = tmp_path / f"release-{pid}"
+        operation = None
+        try:
+            original = await registry.load(sum_model_settings)
+            registry._model_operation_timeout = 0.5
+            operation = asyncio.create_task(registry.load(candidate))
+            await asyncio.wait_for(wait_until((tmp_path / f"entered-{pid}").exists), 5)
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.shield(operation)
+            assert (await index())[candidate.version] == (State.UNAVAILABLE, "")
+            assert pool._recovery_task is not None
+            single = registry._models[candidate.name]
+            (cleanup,) = single._cleanup_tasks.values()
+            if outcome == "removed":
+                catalog.remove(candidate)
+                assert candidate.version not in await index()
+                catalog.append(candidate)
+            if outcome != "worker-timeout":
+                release.touch()
+            # Recovery joins the Load reply and the rollback acknowledgement.
+            await pool._settle_recovery()
+            await asyncio.shield(cleanup)
+
+            reason = ""
+            if outcome in ("exception", "runtime-timeout", "false"):
+                reason = (
+                    "Model failed to load. See the load response and server logs "
+                    "for details."
+                )
+            assert await index() == {
+                candidate.version: (State.UNAVAILABLE, reason),
+                original.version: (State.READY, ""),
+            }
+            if outcome in ("exception", "removed"):
+                assert ErrorModel.error_message in caplog.text
+            elif outcome == "false":
+                assert "returned False" in caplog.text
+            elif outcome == "runtime-timeout":
+                assert (
+                    "builtins.TimeoutError: runtime artifact read timed out"
+                    in caplog.text
+                )
+            with pytest.raises(ModelNotFound):
+                await registry.get_model(candidate.name, candidate.version)
+            assert not pool.has_model(candidate)
+            assert await registry.get_model(original.name, original.version) is original
+            response = await original.predict(inference_request)
+            assert response.outputs[0].data.root == [6]
+            if reason:
+                retry = sum_model_settings.model_copy(deep=True)
+                retry.parameters.version = candidate.version
+                registry._model_operation_timeout = 15
+                await registry.load(retry)
+                assert (await index())[candidate.version] == (State.READY, "")
+                assert not registry.has_load_failure(candidate)
+        finally:
+            release.touch()
+            if operation is not None:
+                await asyncio.gather(operation, return_exceptions=True)
+            await pool.close()
+
+
 @pytest.mark.parametrize("outcome", ["success", "failure", "death"])
+@pytest.mark.usefixtures("prometheus_registry")
 async def test_multiprocess_partial_load_recovery(
-    settings, sum_model_settings, inference_request, tmp_path, outcome
+    settings, sum_model_settings, inference_request, model_repository, tmp_path, outcome
 ):
     # Purpose: Exercise a replacement timeout after one of two real workers acknowledges
     # while the other later succeeds, fails or dies.
@@ -89,6 +360,10 @@ async def test_multiprocess_partial_load_recovery(
         on_model_unload=[pool.unload_model],
         model_operation_timeout=10,
     )
+    probes = DataPlane(settings, registry)
+    probes.startup_complete()
+    repository = ModelRepositoryHandlers(model_repository, registry)
+    ready_only = RepositoryIndexRequest(ready=True, include_registry_models=True)
     replacement = deepcopy(sum_model_settings)
     replacement.platform = "abandoned-platform"
     replacement.parameters.extra["lifecycle_barrier"] = str(tmp_path)
@@ -117,6 +392,17 @@ async def test_multiprocess_partial_load_recovery(
             pool._dispatcher._get_worker()
         with pytest.raises(NoWorkersAvailable):
             await unrelated.predict(inference_request)
+        for strict in (True, False):
+            settings.strict_readiness = strict
+            for _ in range(2):
+                assert await probes.ready() is (not strict)
+                assert not await probes.model_ready(old.name, old.version)
+                assert not await probes.model_ready(unrelated.name, unrelated.version)
+            for model in (old, unrelated):
+                item = await repository._to_item(model.settings)
+                assert item.state == State.UNAVAILABLE
+                assert item.reason == "Model is loaded but has no eligible worker."
+            assert not (await repository.index(ready_only)).root
         assert list(pool._worker_registry.models) == [old.settings, unrelated.settings]
         assert not pool._pending_reload
         registry._model_operation_timeout = 10
@@ -134,6 +420,14 @@ async def test_multiprocess_partial_load_recovery(
         current = await asyncio.wait_for(retry, 15)
         assert current.ready
         assert current is not old
+        settings.strict_readiness = True
+        assert await probes.ready()
+        assert await probes.model_ready(current.name, current.version)
+        assert await probes.model_ready(unrelated.name, unrelated.version)
+        assert {row.name: row.reason for row in await repository.index(ready_only)} == {
+            current.name: "",
+            unrelated.name: "",
+        }
         response = await asyncio.wait_for(current.predict(inference_request), 5)
         assert response.model_name == old.name
         assert len(response.outputs) == 1

@@ -115,6 +115,9 @@ class ErrorModel(MLModel):
             if load_error:
                 raise MLServerError(self.error_message)
 
+            if getattr(self._settings.parameters, "load_timeout", False):
+                raise TimeoutError("runtime artifact read timed out")
+
             load_returns_false = getattr(
                 self._settings.parameters, "load_returns_false", False
             )

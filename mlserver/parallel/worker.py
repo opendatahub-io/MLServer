@@ -270,10 +270,18 @@ class Worker(Process):
     async def _process_model_update(
         self, update: ModelUpdateMessage
     ) -> ModelResponseMessage:
+        load_cancelled = False
+
+        def on_load_cancel() -> None:
+            nonlocal load_cancelled
+            load_cancelled = True
+
         try:
             model_settings = update.model_settings
             if update.update_type == ModelUpdateType.Load:
-                await self._model_registry.load(model_settings, True)
+                await self._model_registry.load(
+                    model_settings, True, _on_cancel=on_load_cancel
+                )
             elif update.update_type == ModelUpdateType.Unload:
                 try:
                     await self._model_registry._unload_exact_version(
@@ -293,7 +301,9 @@ class Worker(Process):
                 "An error occurred processing a model update "
                 f"of type '{update.update_type.name}'."
             )
-            worker_error = WorkerError(e)
+            worker_error = WorkerError(
+                e, deadline_expired=load_cancelled and isinstance(e, TimeoutError)
+            )
             return ModelResponseMessage(id=update.id, exception=worker_error)
 
     def send_request(self, request_message: ModelRequestMessage):
