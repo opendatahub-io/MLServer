@@ -42,8 +42,8 @@ brotli==1.2.1 \
     --hash=sha256:0d02e5260e0954715707f74115dc82798daa6af382466c497a0e1fc7b8ec6f5d \
     --hash=sha256:2cb110a597b366e7a569a06ef0c4e1901cc939c646ad8d739d0247f02cbb3995
 
-certifi==2026.10.23 \
-    --hash=sha256:ad8182e9e73d6d0adaebb791600f2da79daf1af8609933f4b6f147fe7d461e36
+certifi==2026.11.20 \
+    --hash=sha256:649b0f4f46259fbe955f3efc41822271c568c5de5cd1cfeba6be7a71265f4f1a
 
 click==8.5.1 \
     --hash=sha256:cddce66fd1f90b9341da8a4325cb22e3f0bd45518b281942deec99d133af0efb
@@ -197,7 +197,7 @@ starlette-exporter==0.24.0 \
     --hash=sha256:777e518ea01ab4cf3203e2b3617aac7812a7e630d4be44ebc249dcd5d926cfb0
 
 tritonclient==2.73.0+rhaiv.1 \
-    --hash=sha256:11c447b567b9bd1c7ecd5e0b199c1c665095d247b968e2092e71bd32551b1e0e
+    --hash=sha256:de6911756c58ab3f09789731fcdbf9d7d1900a46f94d528b9e6e2d662ab0df5d
 
 typing-extensions==4.16.0 \
     --hash=sha256:97ad7ffcb16360509723f842d72d90fa93428d05caa6899f64cca34277fbedd1
